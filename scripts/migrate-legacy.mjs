@@ -64,15 +64,24 @@ async function migrate() {
         console.log("⚙️ Migrating settings...");
         const settings = db.prepare("SELECT * FROM settings").all();
         for (const setting of settings) {
-            await prisma.setting.upsert({
-                where: { id: setting.id },
-                update: {},
-                create: {
-                    id: setting.id,
-                    key: setting.key,
-                    value: setting.value,
-                }
+            const existing = await prisma.setting.findFirst({
+                where: { key: setting.key, tenantId: setting.tenantId || null }
             });
+            if (existing) {
+                await prisma.setting.update({
+                    where: { id: existing.id },
+                    data: { value: setting.value }
+                });
+            } else {
+                await prisma.setting.create({
+                    data: {
+                        id: setting.id || undefined, // Let Prisma generate if undefined
+                        tenantId: setting.tenantId || null,
+                        key: setting.key,
+                        value: setting.value,
+                    }
+                });
+            }
         }
 
         console.log("✅ Migration successful! All data moved to PostgreSQL.");
