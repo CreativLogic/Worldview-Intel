@@ -90,21 +90,20 @@ const nextConfig: NextConfig = {
 import { withSentryConfig } from "@sentry/nextjs";
 
 export default withSentryConfig(nextConfig, {
-  // For all available options, see:
-  // https://github.com/getsentry/sentry-webpack-plugin#options
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   sentryUrl: process.env.GLITCHTIP_SERVER_URL,
   authToken: process.env.SENTRY_AUTH_TOKEN,
 
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
-
-  // Hides source maps from generated client bundles
+  // GlitchTip doesn't support Sentry's Webpack Debug ID injection correctly.
+  // We disable the Webpack config modification entirely to avoid "Octal escape sequences" 
+  // syntax errors when Next.js bundles WebAssembly fallbacks (e.g., long.js, cesium).
+  webpack: {
+    disableSentryConfig: true,
+  },
+  
+  // Disable uploading source maps
   sourcemaps: {
     disable: true,
   },
-  
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
 });
