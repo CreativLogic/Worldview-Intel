@@ -17,23 +17,9 @@ if ! docker compose version > /dev/null 2>&1; then
     exit 1
 fi
 
-# 1. Generate docker-compose.yml
-echo "📦 Creating docker-compose.yml..."
-cat > docker-compose.yml << 'EOF'
-services:
-  wwv:
-    image: ghcr.io/silvertakana/worldwideview:latest
-    ports:
-      - "3000:3000"
-    volumes:
-      - wwv-data:/app/data
-    env_file:
-      - .env
-    restart: unless-stopped    # ← Auto-starts on boot
-
-volumes:
-  wwv-data:
-EOF
+# 1. Download docker-compose.yml
+echo "📦 Downloading docker-compose.yml..."
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/silvertakana/worldwideview/main/self-host/docker-compose.yml
 
 # 2. Generate .env with a persistent secret
 if [ ! -f .env ]; then
@@ -44,8 +30,12 @@ if [ ! -f .env ]; then
   else
     SECRET=$(head -c 32 /dev/urandom | xxd -p)
   fi
-  echo "AUTH_SECRET=$SECRET" > .env
-  echo "NEXT_PUBLIC_WWV_EDITION=local" >> .env
+  echo "📥 Downloading .env template..."
+  curl -fsSL -o .env https://raw.githubusercontent.com/silvertakana/worldwideview/main/.env.example
+  
+  # Replace AUTH_SECRET= with the generated secret
+  # (macOS sed requires an empty string backup extension, Linux does not. Perl is safer across platforms)
+  perl -pi -e "s/^AUTH_SECRET=.*$/AUTH_SECRET=$SECRET/" .env
 else
   echo "✅ .env already exists, skipping generation."
 fi

@@ -1,6 +1,6 @@
 services:
   wwv:
-    build: .
+    image: ghcr.io/silvertakana/worldwideview:latest
     ports:
       - "3000:3000"
     volumes:
@@ -13,13 +13,14 @@ services:
       - "WWV_DEMO_ADMIN_SECRET=${WWV_DEMO_ADMIN_SECRET:-}"
       - "WWV_BRIDGE_TOKEN=${WWV_BRIDGE_TOKEN:-}"
       - "DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@db:5432/worldwideview?schema=public}"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
 
   db:
     image: postgres:15-alpine
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -34,13 +35,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
-    profiles:
-      - "${WWV_SKIP_LOCAL_DB:-}"
 
 volumes:
   wwv-data:
   postgres-data:
-
-networks:
-  coolify:
-    external: true

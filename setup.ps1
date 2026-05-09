@@ -20,25 +20,8 @@ try {
 }
 
 # Generate docker-compose.yml
-Write-Host "[*] Creating docker-compose.yml..."
-
-$dockerCompose = @(
-"services:"
-"  wwv:"
-"    image: ghcr.io/silvertakana/worldwideview:latest"
-"    ports:"
-"      - `"3000:3000`""
-"    volumes:"
-"      - wwv-data:/app/data"
-"    env_file:"
-"      - .env"
-"    restart: unless-stopped"
-""
-"volumes:"
-"  wwv-data:"
-)
-
-$dockerCompose | Out-File -FilePath docker-compose.yml -Encoding utf8
+Write-Host "[*] Downloading docker-compose.yml..."
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/silvertakana/worldwideview/main/self-host/docker-compose.yml" -OutFile docker-compose.yml
 
 # Generate .env
 if (-Not (Test-Path .env)) {
@@ -46,8 +29,12 @@ if (-Not (Test-Path .env)) {
     $bytes = New-Object Byte[] 32
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $secret = -join ($bytes | ForEach-Object { $_.ToString("x2") })
-    "AUTH_SECRET=$secret" | Out-File -FilePath .env -Encoding ascii
-    "NEXT_PUBLIC_WWV_EDITION=local" | Out-File -FilePath .env -Encoding ascii -Append
+    Write-Host "[*] Downloading .env template..."
+    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/silvertakana/worldwideview/main/.env.example" -OutFile .env
+    
+    $envContent = Get-Content .env -Raw
+    $envContent = $envContent -replace "(?m)^AUTH_SECRET=.*", "AUTH_SECRET=$secret"
+    $envContent | Out-File -FilePath .env -Encoding utf8
 } else {
     Write-Host "[Success] .env already exists, skipping generation."
 }
