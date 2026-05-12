@@ -57,13 +57,13 @@ Your workspace is now ready!
 
 The ISS moves incredibly fast. If our frontend tries to ask for its location every second, it will lag. Instead, we use the **Bring Your Own Backend (BYOB)** pattern. We will write a "Seeder" script in the Data Engine that fetches the ISS location and instantly broadcasts it to the frontend via WebSockets.
 
-### 2.1 Create the Seeder Directory and File
+### 2.1 Let's build a dedicated Seeder to poll the Open Notify ISS API. Note that seeders are organized into `community` or `private` tiers to prevent collisions.
 
-Navigate to your `worldwideview` repository. Inside the `local-seeders` folder, create a new folder named `community/iss`. Inside that folder, create a file named `seeder.mjs`:
-`c:\dev\worldwideview\local-seeders\community\iss\seeder.mjs`
+1. **Create the Seeder Folder:** Under your WorldWideView repository root, create `local-seeders/community/wwv-iss-tracker/`. Inside that folder, create a file named `seeder.mjs`:
+`c:\dev\worldwideview\local-seeders\community\wwv-iss-tracker\seeder.mjs`
 
 > [!NOTE]
-> **Dependency Management:** You do *not* need to create a `package.json` or manually install standard dependencies (like `axios`) for your seeder. The `wwv-data-engine` runner dynamically resolves these via the pnpm workspace, keeping your seeder lightweight.
+> **Dependency Management:** You do *not* need to create a `package.json` or manually install standard dependencies (like `axios`) for your seeder. The `wwv-data-engine-v2` runner dynamically resolves these via the pnpm workspace, keeping your seeder lightweight.
 
 ### 2.2 Write the Polling Logic
 

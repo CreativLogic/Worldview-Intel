@@ -430,7 +430,7 @@ On subscribe, the engine immediately pushes the latest cached Redis snapshot —
 2. Plugin's `getServerConfig().streamUrl` (code override)
 3. Plugin's `PluginManifest.dataSource.streamUrl` (manifest override)
 4. `NEXT_PUBLIC_WWV_PLUGIN_DATA_ENGINE_URL` env var
-5. Fallback: `wss://dataengine.worldwideview.dev/stream` (cloud)
+5. Fallback: `wss://dataenginev2.worldwideview.dev/stream` (cloud)
 
 ### 3.3 Full Data Flow
 
