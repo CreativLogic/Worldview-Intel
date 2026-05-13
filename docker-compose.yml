@@ -2,8 +2,8 @@ services:
   wwv:
     image: ghcr.io/silvertakana/worldwideview:latest
     pull_policy: always
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     volumes:
       - wwv-data:/app/data
     env_file:
@@ -45,8 +45,8 @@ services:
 
   wwv-data-engine:
     image: ghcr.io/silvertakana/wwv-data-engine:latest
-    expose:
-      - "5000"
+    ports:
+      - '5000:5000'
     environment:
       - PORT=5000
       - REDIS_URL=redis://wwv-redis:6379
