@@ -61,7 +61,7 @@ describe("resolveEngineUrl", () => {
     await fetchLocalEngineManifest();
 
     const url = resolveEngineUrl("plugin-local");
-    expect(url).toContain("localhost:5000/stream");
+    expect(url).toContain("localhost:5001/stream");
   });
 
   it("should fall back to plugin's custom streamUrl if not local", () => {
