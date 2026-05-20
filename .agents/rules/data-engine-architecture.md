@@ -1,6 +1,9 @@
 ---
-trigger: model_decision
-description: Architecture rules and dependency management guidelines for wwv-data-engine seeders.
+description: Architecture rules and dependency management guidelines for wwv-data-engine seeders, pnpm workspace dependency loading, and WebSocket payload contracts.
+paths:
+  - "packages/**/*"
+  - "local-seeders/**/*"
+  - "docker-compose.yml"
 ---
 
 # Data Engine V2 Architecture & Dependency Loading

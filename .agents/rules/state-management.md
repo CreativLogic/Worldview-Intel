@@ -1,7 +1,8 @@
 ---
-trigger: glob
 description: Guidelines on managing the single source of truth across WorldWideView using Zustand, avoiding prop-drilling, and isolating UI rerenders.
-globs: "src/core/state/**/*, src/components/**/*"
+paths:
+  - "src/core/state/**/*"
+  - "src/components/**/*"
 ---
 
 # Zustand State Management

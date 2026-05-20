@@ -1,3 +1,9 @@
+---
+description: Rules for safe Prisma schema changes, defensive migrations, and PostgreSQL DDL operations.
+paths:
+  - "prisma/**/*"
+---
+
 # Database Migrations & Schema Modification Rules
 
 ## 1. Defensive Migrations

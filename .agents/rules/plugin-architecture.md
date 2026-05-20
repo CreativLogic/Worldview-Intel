@@ -1,6 +1,10 @@
 ---
-trigger: model_decision
 description: The standard operating procedure for instantiating, modifying, and registering a new data source plugin within the engine.
+paths:
+  - "src/core/plugins/**/*"
+  - "packages/wwv-plugin-*/src/**/*"
+  - "local-plugins/**/*"
+  - "packages/wwv-plugin-sdk/src/**/*"
 ---
 
 # Plugin Architecture & Data Flow

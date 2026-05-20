@@ -1,7 +1,9 @@
 ---
-trigger: glob
 description: Strict guidelines for rendering geospatial entities, handling 3D terrain clipping, and applying dynamic animation properties against Cesium's runtime engine.
-globs: "src/core/globe/**/*"
+paths:
+  - "src/core/globe/**/*"
+  - "src/plugins/**/*"
+  - "packages/wwv-plugin-*/src/**/*"
 ---
 
 # Cesium Rendering Rules

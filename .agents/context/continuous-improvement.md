@@ -1,5 +1,5 @@
 ---
-trigger: always_on
+trigger: model_decision
 description: Guidelines for ongoing project maintenance, cleanliness, and self-correction during everyday development tasks.
 ---
 

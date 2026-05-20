@@ -1,3 +1,12 @@
+---
+description: Docker build patterns, pnpm dev commands, Vitest strategy, Coolify deployment rules, and security headers.
+paths:
+  - "Dockerfile"
+  - "docker-compose.yml"
+  - ".github/**/*"
+  - "next.config.ts"
+---
+
 # Deployment, Testing, and Operations
 
 ## Development Commands

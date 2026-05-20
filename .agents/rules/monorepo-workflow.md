@@ -1,7 +1,9 @@
 ---
-trigger: model_decision
 description: Strict rules for operating within the pnpm monorepo workspace environment structure across frontend and backend services.
-globs: ""
+paths:
+  - "packages/**/*"
+  - "pnpm-workspace.yaml"
+  - "local-plugins/**/*"
 ---
 
 # Monorepo Workflow Guidelines

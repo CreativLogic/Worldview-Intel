@@ -1,6 +1,8 @@
 ---
-trigger: model_decision
-description: Guidelines for the WorldwideView plugin marketplace, database interactions, and dynamic plugin installation.
+description: Guidelines for the WorldWideView plugin marketplace, database interactions, PKCE auth flow, and dynamic plugin installation.
+paths:
+  - "src/lib/marketplace/**/*"
+  - "src/app/api/marketplace/**/*"
 ---
 
 # Marketplace Architecture

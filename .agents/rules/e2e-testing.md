@@ -1,7 +1,6 @@
 ---
-trigger: testing
 description: Guidelines and architecture for the Playwright End-to-End (E2E) testing infrastructure.
-globs:
+paths:
   - "tests/**"
   - "public/e2e-fixtures/**"
   - "playwright.config.ts"

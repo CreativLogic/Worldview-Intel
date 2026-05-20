@@ -1,6 +1,11 @@
 ---
-trigger: model_decision
 description: Cloud edition implementation details, PostgreSQL Row-Level Security (RLS) isolation, cross-subdomain auth, and cryptographic license keys.
+paths:
+  - "src/lib/auth*"
+  - "src/app/api/auth/**/*"
+  - "src/core/auth.ts"
+  - "src/core/storage.ts"
+  - "src/core/tenant.ts"
 ---
 
 # WorldWideView — Cloud & Auth Architecture
