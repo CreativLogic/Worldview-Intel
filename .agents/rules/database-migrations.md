@@ -13,10 +13,22 @@ When making database schema changes, you must ensure that generated migrations a
 - **Add "IF EXISTS" clauses**: Prisma can sometimes produce brittle drop statements (`DROP INDEX "my_index"`). To prevent migrations from crashing if a state desynchronization occurs, manually edit the migration file to use `DROP INDEX IF EXISTS "my_index";` or `DROP TABLE IF EXISTS "table_name";`.
 - **Data Preservation**: When dropping columns or renaming, carefully review the migration to ensure data is correctly mapped. In PostgreSQL, ensure that cascaded drops don't accidentally remove required data.
 
-## 2. Managing Failed Migrations
+## 2. P3005 Auto-Baseline (Handled in `docker-entrypoint.sh`)
+
+`docker-entrypoint.sh` automatically recovers from Prisma **P3005** ("schema not empty, no migration history"). This happens when `pnpm dev` (which runs `prisma db push`) populates the database before the Docker stack is started.
+
+The entrypoint only auto-baselines when **both** conditions hold:
+1. The error is exactly P3005.
+2. `prisma migrate diff` reports zero schema drift between the live DB and `prisma/schema.prisma`.
+
+If drift is detected the container exits with a clear error message directing you to `pnpm db:reset`.
+
+> **Never add manual `migrate resolve --applied` calls** unless you are outside the container and have independently verified the above two conditions. The entrypoint already handles the common case.
+
+## 3. Managing Failed Migrations
 If a migration fails in production:
 - **Never blindly mark as resolved**: Do not run `prisma migrate resolve --applied <migration_name>` unless you have explicitly verified that the database schema precisely matches the expected state.
 - If you use `resolve --applied`, Prisma will permanently skip that migration in the future, leaving your database structurally out of sync with your Prisma Client.
 
-## 3. Backups Before DDL
+## 4. Backups Before DDL
 Never perform direct DDL operations (ALTER, DROP, CREATE) on a production database without first confirming an automated backup exists, or manually taking a `pg_dump` backup of the database.

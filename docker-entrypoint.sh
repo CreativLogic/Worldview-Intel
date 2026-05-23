@@ -29,8 +29,60 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 echo "[entrypoint] Running database migrations..."
-prisma migrate deploy
-echo "[entrypoint] Migrations complete."
+set +e
+MIGRATE_OUT=$(prisma migrate deploy 2>&1)
+MIGRATE_CODE=$?
+set -e
+
+if [ $MIGRATE_CODE -eq 0 ]; then
+  echo "[entrypoint] Migrations complete."
+elif echo "$MIGRATE_OUT" | grep -q "P3005"; then
+  # P3005: schema exists but _prisma_migrations has no history.
+  # Happens when 'prisma db push' (pnpm dev) ran before 'prisma migrate deploy' (docker).
+  # Safe to auto-baseline only if there is zero schema drift.
+  echo "[entrypoint] P3005: schema exists without migration history."
+  echo "[entrypoint] Verifying schema matches migrations before auto-baselining..."
+  set +e
+  DIFF_OUT=$(prisma migrate diff \
+    --from-url "$DATABASE_URL" \
+    --to-schema-datamodel prisma/schema.prisma \
+    --script 2>&1)
+  DIFF_CODE=$?
+  set -e
+  if [ $DIFF_CODE -ne 0 ]; then
+    echo "[entrypoint] Could not verify schema state — aborting." >&2
+    echo "$DIFF_OUT" >&2
+    exit 1
+  fi
+  # Positive-match for DDL keywords: any real drift emits at least one of these.
+  # Checking for presence is safer than checking for absence of content.
+  if echo "$DIFF_OUT" | grep -qiE "^(CREATE|ALTER|DROP|INSERT|UPDATE|DELETE|TRUNCATE)"; then
+    echo "[entrypoint] Schema drift detected — cannot auto-baseline." >&2
+    echo "[entrypoint] Run 'pnpm db:reset' to wipe and re-migrate, or resolve drift manually." >&2
+    echo "$MIGRATE_OUT" >&2
+    exit 1
+  fi
+  echo "[entrypoint] No drift detected. Baselining existing schema..."
+  for migration_dir in prisma/migrations/*/; do
+    if [ -f "${migration_dir}migration.sql" ]; then
+      migration_name=$(basename "$migration_dir")
+      echo "[entrypoint] Marking as applied: $migration_name"
+      set +e
+      prisma migrate resolve --applied "$migration_name"
+      RESOLVE_CODE=$?
+      set -e
+      if [ $RESOLVE_CODE -ne 0 ]; then
+        echo "[entrypoint] Failed to baseline $migration_name — aborting." >&2
+        exit 1
+      fi
+    fi
+  done
+  prisma migrate deploy
+  echo "[entrypoint] Migrations complete."
+else
+  echo "$MIGRATE_OUT" >&2
+  exit $MIGRATE_CODE
+fi
 
 # Generate self-signed SSL certificates for local HTTPS bridging if they don't exist
 if [ ! -f "./data/localhost.crt" ] || [ ! -f "./data/localhost.key" ]; then
