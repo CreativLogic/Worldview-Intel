@@ -207,7 +207,11 @@ class WebSocketClient {
 
     engine.subscriptions.add(pluginId);
     this.connectEngine(engineUrl);
-    this.send(engine, { action: "subscribe", pluginId });
+    // Only send immediately if auth is not in-flight; the welcome handler will
+    // replay all pending subscriptions once auth succeeds (see onmessage:121-124).
+    if (!engine.awaitingWelcome) {
+      this.send(engine, { action: "subscribe", pluginId });
+    }
   }
 
   public unsubscribe(pluginId: string, engineUrl: string) {

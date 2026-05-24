@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true,
         secure: isHttps,
         sameSite: "lax",
-        path: "/api/marketplace/callback",
+        path: "/", // __Host- prefix requires path="/" per RFC 6265bis
         maxAge: 60 * 10 // 10 minutes
     });
 
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true,
         secure: isHttps,
         sameSite: "lax",
-        path: "/api/marketplace/callback",
+        path: "/", // __Host- prefix requires path="/" per RFC 6265bis
         maxAge: 60 * 10 // 10 minutes
     });
 

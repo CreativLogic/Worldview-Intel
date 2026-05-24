@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true,
         secure: isHttps,
         sameSite: "lax",
-        path: "/api/marketplace/callback",
+        path: "/", // must match the path used at Set-Cookie time
         maxAge: 0
     });
 
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
         httpOnly: true,
         secure: isHttps,
         sameSite: "lax",
-        path: "/api/marketplace/callback",
+        path: "/", // must match the path used at Set-Cookie time
         maxAge: 0
     });
 

@@ -56,7 +56,7 @@ describe("PKCE Flow", () => {
             expect(cookies).toContain("HttpOnly");
             expect(cookies).toContain("Secure");
             expect(cookies).toContain("SameSite=lax");
-            expect(cookies).toContain("Path=/api/marketplace/callback");
+            expect(cookies).toContain("Path=/"); // __Host- prefix requires Path=/ per RFC 6265bis
             // Check __Host- prefix if in production (assuming https testing context)
             expect(cookies).toMatch(/__Host-pkce_verifier/);
         });
