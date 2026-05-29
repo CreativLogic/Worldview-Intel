@@ -72,6 +72,23 @@ mapWebsocketPayload(payload: any, existingEntities: GeoEntity[]): GeoEntity[]
 - `existingEntities` — current entities in the store for this plugin (use for incremental updates)
 - Must return a **complete replacement** `GeoEntity[]` (not a diff)
 
+### Property Tag Helpers
+
+Always wrap typed property values with the SDK helpers so the Intel panel renders them richly:
+
+```ts
+import { dtProp, urlProp, imageProp, videoProp } from "@worldwideview/wwv-plugin-sdk";
+
+properties: {
+    updated: dtProp(item.updated_at ?? null),   // renders as expandable datetime row
+    source:  urlProp(item.source_url ?? null),   // renders as clickable link
+    preview: imageProp(item.image ?? null),      // renders as inline thumbnail
+    stream:  videoProp(item.video_url ?? null),  // renders as "Watch" link
+}
+```
+
+All helpers are null-safe and return `null` for empty input. Plain string/number values that don't need rich rendering need no wrapper.
+
 ---
 
 ## Plugin Architectures (Manifest Formats)
