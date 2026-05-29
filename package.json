@@ -28,6 +28,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
     "@auth/supabase-adapter": "^1.11.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@prisma/client-runtime-utils": "7.8.0",
@@ -120,4 +121,3 @@
     "pnpm": ">=9.0.0"
   }
 }
-
