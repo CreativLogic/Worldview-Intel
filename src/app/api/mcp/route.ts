@@ -27,7 +27,6 @@
 
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { z } from "zod";
 import { isDemo } from "@/core/edition";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { createMcpServer } from "@/lib/mcp/server";
@@ -35,9 +34,8 @@ import { mcpLimiter, getClientIp } from "@/lib/rateLimiters";
 import { registerGlobeResources } from "./globeResources";
 import { registerDataQueryTools } from "@/lib/mcp/tools";
 import { registerGlobeCommandTools } from "./globeCommandTools";
-import { readSessionCatalog } from "@/lib/mcpSessionCatalog";
 import { resolveActiveSessionId } from "@/lib/globeCommandQueue";
-import { composePluginToolsList } from "./pluginToolsList";
+import { registerPluginToolDispatch } from "./pluginToolDispatch";
 
 // ---------------------------------------------------------------------------
 // JSON-RPC 2.0 error response helpers
@@ -98,18 +96,17 @@ function withStreamingHeaders(sdkResponse: Response): Response {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 21: dynamic plugin tool registrar
+// Phase 21 Wave 3: plugin tool dispatch registrar
 // ---------------------------------------------------------------------------
 
 /**
- * Reads the per-session catalog for the authenticated user and registers each
- * unique namespaced plugin tool on the server so they appear in tools/list.
- *
- * Tool handlers at this wave return a pending-relay message -- actual browser
- * execution is wired in Wave 3 (21-04-PLAN).
+ * Reads the per-session catalog for the authenticated user and registers a
+ * relay handler for each namespaced plugin tool. The handler validates input,
+ * enqueues the invocation for the browser, and waits for the browser result
+ * (blpop with a 10-second deadline). Returns a graceful timeout if no result.
  *
  * Security:
- *   - userId comes from the auth result; never from the request or body.
+ *   - userId and sessionId come from the auth result; never from the request.
  *   - Catalog is scoped to the most-recently-active session for this user.
  *   - No DB/tenantId enumeration -- catalog is browser-published only.
  *   - Server stays plugin-agnostic: no streamUrl / data-engine access.
@@ -122,43 +119,9 @@ async function registerPluginTools(
 ): Promise<void> {
     // Resolve the active session for this user (ZSET globe:sessions)
     const sessionId = await resolveActiveSessionId(userId);
-    if (!sessionId) return;
 
-    // Read the browser-published catalog for this session
-    const catalog = await readSessionCatalog(userId, sessionId);
-
-    // composePluginToolsList returns all tools; we only need the plugin subset
-    // (system tools are already registered by the phase 19/20 registrars above).
-    const allTools = composePluginToolsList(catalog);
-    const systemNames = new Set([
-        "pan_globe", "focus_entity", "toggle_layer", "set_timeline",
-        "search_entities", "get_entities_in_region", "get_entity_details", "get_plugin_data",
-    ]);
-
-    for (const tool of allTools) {
-        if (systemNames.has(tool.name)) continue;
-
-        // Register the plugin tool -- handler is a stub until Wave 3 wires relay.
-        server.registerTool(
-            tool.name,
-            {
-                description: tool.description,
-                inputSchema: { args: z.record(z.string(), z.unknown()).optional() },
-            },
-            async (_input) => ({
-                content: [
-                    {
-                        type: "text" as const,
-                        text: JSON.stringify({
-                            pending: true,
-                            tool: tool.name,
-                            note: "Plugin tool relay is wired in Wave 3 (21-04).",
-                        }),
-                    },
-                ],
-            }),
-        );
-    }
+    // Delegate to the dispatch registrar (pluginToolDispatch.ts).
+    await registerPluginToolDispatch(server, { userId, sessionId });
 }
 
 // ---------------------------------------------------------------------------

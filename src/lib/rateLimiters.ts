@@ -67,3 +67,21 @@ export const apiKeyManagementLimiter = new RateLimiter({
     windowMs: 60_000,
     maxRequests: 10,
 });
+
+/**
+ * GET /api/mcp/invocations -- browser bridge polls for pending tool invocations.
+ * 120 req/60s per IP mirrors globeCommandsLimiter (several tabs at ~1500ms).
+ */
+export const mcpInvocationsLimiter = new RateLimiter({
+    windowMs: 60_000,
+    maxRequests: 120,
+});
+
+/**
+ * POST /api/mcp/results -- browser bridge posts tool execution results.
+ * 60 req/60s per IP: one result per invocation, invocations are bounded.
+ */
+export const mcpResultsLimiter = new RateLimiter({
+    windowMs: 60_000,
+    maxRequests: 60,
+});
