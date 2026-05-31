@@ -165,20 +165,39 @@ function CopyField({ value, label, multiline = false }: CopyFieldProps) {
 
 // ---------------------------------------------------------------------------
 // Agent-capabilities prompt (CONNECT-03)
-// Tool-agnostic: Phase 17 ships no tools; tools arrive in Phase 18+.
+// Lists the v1.3 Location Intelligence tools an agent can call. Keep in sync
+// with the registrars in src/app/api/mcp/*Tools.ts. Plugin filter authoring is
+// documented in docs/plugin-filter-guide.md.
 // ---------------------------------------------------------------------------
 
 const AGENT_PROMPT = `You have access to the WorldWideView (WWV) geospatial intelligence engine via MCP.
 WWV visualizes real-time global data on an interactive 3D CesiumJS globe, including aviation,
 incidents, weather, and custom data plugins.
 
-This MCP connection is currently live and authenticated. WWV is preparing to expose tools and
-resources for querying globe entities, plugins, and live data feeds in upcoming releases. Once
-tools are available you will be able to list entities, search by geospatial bounds, inspect plugin
-configurations, and interact with live data streams.
+This MCP connection is live and authenticated. You can call these tools:
 
-When the user asks about global data, geospatial queries, or globe visualisation, use this
-connection to guide them through the WWV interface and surface live data as tools become available.`;
+Data query:
+- search_entities: search entities by name across active plugins; supports optional inline filters.
+- get_entities_in_region: find entities inside a lat/lng bounding box.
+- get_entity_details: get full details for one entity by pluginId + entityId.
+- get_plugin_data: get the current snapshot of all entities for a plugin.
+
+Location (geocoding + camera):
+- geocode_location: resolve a place name or address to coordinates and a bounding box.
+- fly_to: fly the live globe camera to a coordinate or bounding box.
+
+Favorites:
+- save_favorite: bookmark an entity so the user can return to it later.
+- list_favorites: list the user's bookmarks, each with a live/stale status.
+- remove_favorite: delete a bookmarked entity.
+
+Live filtering:
+- get_plugin_filters: list the filterable fields a plugin declares.
+- set_filter: apply filters to a plugin's layer on the live globe.
+- clear_filter: clear one plugin's filters, or all filters.
+
+When the user asks about global data, geospatial queries, or globe visualisation, use these tools
+to find places, move the camera, search and filter live entities, and manage their bookmarks.`;
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -250,6 +269,9 @@ export function ConnectAgentHelper({ token }: ConnectAgentHelperProps) {
             Paste this into your agent&apos;s system prompt or first message to describe WWV.
           </div>
           <CopyField label="Capabilities prompt" value={AGENT_PROMPT} multiline />
+          <div style={{ ...mutedMicro, marginTop: "var(--space-xs)" }}>
+            Plugin authors: see docs/plugin-filter-guide.md to declare filterable fields for set_filter / get_plugin_filters.
+          </div>
 
           {/* Section: Claude Code CLI -- deferred (D-17-08) */}
           <div style={subHeaderStyle}>Claude Code CLI</div>
