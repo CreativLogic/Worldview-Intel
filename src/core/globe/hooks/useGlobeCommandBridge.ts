@@ -30,6 +30,7 @@ function dispatchCommand(cmd: GlobeCommand): void {
             }
             break;
 
+
         case "focusEntity":
             if (cmd.lat !== undefined && cmd.lon !== undefined) {
                 dataBus.emit("cameraGoTo", {

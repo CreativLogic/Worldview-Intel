@@ -131,7 +131,7 @@ describe("isValidGlobeCommand", () => {
     // CMD-07
     it("returns false for an unknown type", () => {
         expect(
-            isValidGlobeCommand({ type: "flyTo", lat: 1, lon: 2 })
+            isValidGlobeCommand({ type: "unknownCommand", lat: 1, lon: 2 })
         ).toBe(false);
     });
 
