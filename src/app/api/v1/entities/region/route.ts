@@ -65,11 +65,12 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 1000);
 
     try {
-        const entities = await getEntitiesInRegion({ north, south, east, west, pluginId, limit });
+        const result = await getEntitiesInRegion({ north, south, east, west, pluginId, limit });
         return NextResponse.json({
-            entities,
-            count: entities.length,
+            entities: result.entities,
+            count: result.entities.length,
             bounds: { north, south, east, west },
+            ...(result.emptyReason !== undefined && { emptyReason: result.emptyReason }),
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : "Internal server error";

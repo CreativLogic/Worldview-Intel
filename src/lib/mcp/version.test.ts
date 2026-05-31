@@ -65,7 +65,7 @@ const ctx = { userId: "u1" };
 beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(schemas).forEach((k) => delete schemas[k]);
-    registerDataQueryTools(stubServer as never);
+    registerDataQueryTools(stubServer as never, ctx);
     registerGeocodingTools(stubServer as never, ctx);
     registerFavoritesTools(stubServer as never, ctx);
     registerFilterTools(stubServer as never, ctx);

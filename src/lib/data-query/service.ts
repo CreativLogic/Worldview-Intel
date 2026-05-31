@@ -4,6 +4,8 @@ import type {
     RegionOptions,
     DetailResult,
     PluginDataSnapshot,
+    QueryResult,
+    SingleResult,
 } from "./types";
 import { matchFilterValue } from "@/core/filters/matchFilterValue";
 import type { FilterValue } from "@/core/plugins/PluginTypes";
@@ -102,17 +104,30 @@ export async function searchEntities(
     pluginId?: string,
     limit: number = 20,
     filters?: Record<string, FilterValue>,
-): Promise<SearchResult[]> {
+): Promise<QueryResult<SearchResult>> {
     const trimmed = query.trim();
-    if (trimmed === "") return [];
+    if (trimmed === "") return { entities: [], emptyReason: "no_data_matches" };
 
     const effectiveLimit = Math.min(Math.max(limit, 1), 100);
     const lower = trimmed.toLowerCase();
     const filterEntries = filters ? Object.entries(filters) : null;
 
-    const snapshots = pluginId
-        ? await fetchPluginSnapshot(pluginId).then((s) => (s ? [s] : []))
-        : await getAllPluginSnapshots();
+    // Determine if the plugin is known to the engine (streaming check).
+    let snapshotNotStreaming = false;
+    let snapshots: PluginDataSnapshot[];
+    if (pluginId) {
+        const s = await fetchPluginSnapshot(pluginId);
+        if (s === null) {
+            return { entities: [], emptyReason: "plugin_not_streaming" };
+        }
+        snapshots = [s];
+    } else {
+        snapshots = await getAllPluginSnapshots();
+        // When no pluginId filter: 0 snapshots means engine has no active plugins.
+        if (snapshots.length === 0) {
+            snapshotNotStreaming = true;
+        }
+    }
 
     const results: SearchResult[] = [];
     for (const snapshot of snapshots) {
@@ -132,10 +147,17 @@ export async function searchEntities(
         }
         if (results.length >= effectiveLimit) break;
     }
-    return results;
+
+    if (results.length === 0) {
+        return {
+            entities: [],
+            emptyReason: snapshotNotStreaming ? "plugin_not_streaming" : "no_data_matches",
+        };
+    }
+    return { entities: results };
 }
 
-export async function getEntitiesInRegion(bounds: RegionOptions): Promise<SearchResult[]> {
+export async function getEntitiesInRegion(bounds: RegionOptions): Promise<QueryResult<SearchResult>> {
     const { north, south, east, west } = bounds;
     if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) {
         throw new Error("Invalid bounding box: north/south/east/west must all be numbers");
@@ -144,9 +166,20 @@ export async function getEntitiesInRegion(bounds: RegionOptions): Promise<Search
     const effectiveLimit = Math.min(bounds.limit ?? 100, 1000);
     const isAntimeridian = east < west;
 
-    const snapshots = bounds.pluginId
-        ? await fetchPluginSnapshot(bounds.pluginId).then((s) => (s ? [s] : []))
-        : await getAllPluginSnapshots();
+    let snapshotNotStreaming = false;
+    let snapshots: PluginDataSnapshot[];
+    if (bounds.pluginId) {
+        const s = await fetchPluginSnapshot(bounds.pluginId);
+        if (s === null) {
+            return { entities: [], emptyReason: "plugin_not_streaming" };
+        }
+        snapshots = [s];
+    } else {
+        snapshots = await getAllPluginSnapshots();
+        if (snapshots.length === 0) {
+            snapshotNotStreaming = true;
+        }
+    }
 
     const results: SearchResult[] = [];
     for (const snapshot of snapshots) {
@@ -161,38 +194,50 @@ export async function getEntitiesInRegion(bounds: RegionOptions): Promise<Search
         }
         if (results.length >= effectiveLimit) break;
     }
-    return results;
+
+    if (results.length === 0) {
+        return {
+            entities: [],
+            emptyReason: snapshotNotStreaming ? "plugin_not_streaming" : "no_data_matches",
+        };
+    }
+    return { entities: results };
 }
 
 export async function getEntityDetails(
     pluginId: string,
     entityId: string,
-): Promise<DetailResult | null> {
+): Promise<SingleResult<DetailResult>> {
     const snapshot = await fetchPluginSnapshot(pluginId);
-    if (!snapshot) return null;
+    if (!snapshot) return { data: null, emptyReason: "plugin_not_streaming" };
 
     const entity = snapshot.entities.find((e) => e.id === entityId);
-    if (!entity) return null;
+    if (!entity) return { data: null, emptyReason: "no_data_matches" };
 
     return {
-        id: entity.id,
-        pluginId: entity.pluginId,
-        latitude: entity.latitude,
-        longitude: entity.longitude,
-        altitude: entity.altitude,
-        heading: entity.heading,
-        speed: entity.speed,
-        timestamp: entity.timestamp,
-        label: entity.label,
-        properties: entity.properties,
+        data: {
+            id: entity.id,
+            pluginId: entity.pluginId,
+            latitude: entity.latitude,
+            longitude: entity.longitude,
+            altitude: entity.altitude,
+            heading: entity.heading,
+            speed: entity.speed,
+            timestamp: entity.timestamp,
+            label: entity.label,
+            properties: entity.properties,
+        },
     };
 }
 
-export async function getPluginData(pluginId: string): Promise<PluginDataSnapshot | null> {
-    if (!pluginId.trim()) return null;
+export async function getPluginData(pluginId: string): Promise<SingleResult<PluginDataSnapshot>> {
+    if (!pluginId.trim()) return { data: null, emptyReason: "plugin_not_streaming" };
     try {
-        return fetchPluginSnapshot(pluginId);
+        const snapshot = await fetchPluginSnapshot(pluginId);
+        if (snapshot === null) return { data: null, emptyReason: "plugin_not_streaming" };
+        if (snapshot.entities.length === 0) return { data: snapshot, emptyReason: "no_data_matches" };
+        return { data: snapshot };
     } catch {
-        return null;
+        return { data: null, emptyReason: "plugin_not_streaming" };
     }
 }

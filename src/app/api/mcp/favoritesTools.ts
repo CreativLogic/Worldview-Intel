@@ -138,7 +138,7 @@ export function registerFavoritesTools(
                             return { ...fav, status: "stale" as const };
                         }
                         const detail = await getEntityDetails(fav.pluginId, fav.entityId);
-                        return { ...fav, status: detail !== null ? ("live" as const) : ("stale" as const) };
+                        return { ...fav, status: detail.data !== null ? ("live" as const) : ("stale" as const) };
                     }),
                 );
                 return textResult(JSON.stringify(results));

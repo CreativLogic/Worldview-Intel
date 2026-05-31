@@ -14,7 +14,7 @@ const mockServer = {
 beforeEach(() => {
     vi.clearAllMocks();
     Object.keys(schemas).forEach((k) => delete schemas[k]);
-    registerDataQueryTools(mockServer as never);
+    registerDataQueryTools(mockServer as never, { userId: "test-user" });
 });
 
 describe("data query tool descriptions (DESC-02)", () => {

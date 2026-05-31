@@ -35,7 +35,7 @@ describe("GET /api/v1/entities/region", () => {
     beforeEach(() => {
         vi.resetAllMocks();
         vi.mocked(authenticateApiKey).mockResolvedValue({ userId: "u1", keyId: "k1" });
-        vi.mocked(getEntitiesInRegion).mockResolvedValue([]);
+        vi.mocked(getEntitiesInRegion).mockResolvedValue({ entities: [] });
     });
 
     it("returns 401 when no API key", async () => {
@@ -65,7 +65,7 @@ describe("GET /api/v1/entities/region", () => {
             longitude: -0.1,
             name: "London",
         };
-        vi.mocked(getEntitiesInRegion).mockResolvedValue([entity]);
+        vi.mocked(getEntitiesInRegion).mockResolvedValue({ entities: [entity] });
         const req = makeRequest({ north: "52", south: "50", east: "1", west: "-1" });
         const res = await GET(req);
         const body = await res.json();

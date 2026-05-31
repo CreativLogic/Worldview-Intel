@@ -44,12 +44,13 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Number.isNaN(parsed) ? 20 : parsed, 100);
 
     try {
-        const entities = await searchEntities(q, pluginId, limit);
+        const result = await searchEntities(q, pluginId, limit);
         return NextResponse.json({
-            entities,
-            count: entities.length,
+            entities: result.entities,
+            count: result.entities.length,
             query: q,
             ...(pluginId !== undefined && { pluginId }),
+            ...(result.emptyReason !== undefined && { emptyReason: result.emptyReason }),
         });
     } catch (err) {
         console.error("[entities/search] GET error:", err);

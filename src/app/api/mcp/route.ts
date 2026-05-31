@@ -173,7 +173,7 @@ async function handleMcpRequest(request: Request): Promise<Response> {
     //   Phase 22: registerGeocodingTools, registerFavoritesTools
     //   Phase 23: registerFilterTools (set_filter, clear_filter, get_plugin_filters)
     registerGlobeResources(server, { userId: authResult.userId });
-    registerDataQueryTools(server);
+    registerDataQueryTools(server, { userId: authResult.userId });
     registerGlobeCommandTools(server, { userId: authResult.userId });
     registerGeocodingTools(server, { userId: authResult.userId });
     registerFavoritesTools(server, { userId: authResult.userId });

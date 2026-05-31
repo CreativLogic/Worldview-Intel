@@ -35,7 +35,7 @@ describe("GET /api/v1/entities/search", () => {
     beforeEach(() => {
         vi.resetAllMocks();
         vi.mocked(authenticateApiKey).mockResolvedValue({ userId: "u1", keyId: "k1" });
-        vi.mocked(searchEntities).mockResolvedValue([]);
+        vi.mocked(searchEntities).mockResolvedValue({ entities: [] });
     });
 
     it("returns 401 when no API key", async () => {
@@ -59,7 +59,7 @@ describe("GET /api/v1/entities/search", () => {
             longitude: -0.1,
             name: "London",
         };
-        vi.mocked(searchEntities).mockResolvedValue([entity]);
+        vi.mocked(searchEntities).mockResolvedValue({ entities: [entity] });
         const req = makeRequest({ q: "test" });
         const res = await GET(req);
         const body = await res.json();

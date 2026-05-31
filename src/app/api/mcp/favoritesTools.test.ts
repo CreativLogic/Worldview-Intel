@@ -91,7 +91,7 @@ describe("list_favorites tool handler", () => {
             { id: "1", entityId: "ship:123", pluginId: "maritime", userId: "u1", pluginName: "Maritime", createdAt: new Date() },
         ] as never);
         mockReadActiveSessions.mockResolvedValue([{ sessionId: "sess-abc", lastSeen: Date.now() }]);
-        mockGetEntityDetails.mockResolvedValue({ entityId: "ship:123", lat: 1, lon: 2 } as never);
+        mockGetEntityDetails.mockResolvedValue({ data: { entityId: "ship:123", lat: 1, lon: 2 } } as never);
 
         const result = await handlers["list_favorites"]({});
 
@@ -118,7 +118,7 @@ describe("list_favorites tool handler", () => {
             { id: "1", entityId: "ship:123", pluginId: "maritime", userId: "u1", pluginName: "Maritime", createdAt: new Date() },
         ] as never);
         mockReadActiveSessions.mockResolvedValue([{ sessionId: "sess-abc", lastSeen: Date.now() }]);
-        mockGetEntityDetails.mockResolvedValue(null);
+        mockGetEntityDetails.mockResolvedValue({ data: null, emptyReason: "plugin_not_streaming" } as never);
 
         const result = await handlers["list_favorites"]({});
 
