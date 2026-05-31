@@ -66,7 +66,11 @@ export function registerGlobeCommandTools(
         "pan_globe",
         {
             description:
-                "Fly the globe camera to a geographic position. Provide lat/lon/alt (metres). Optional heading, pitch, and animation duration.",
+                "Fly the globe camera to an explicit coordinate. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
+                "Prefer pan_globe over focus_entity when you have a lat/lon and no entity id, or when focus_entity entity-id resolution is not needed. " +
+                "Limitations: latitude [-90, 90], longitude [-180, 180], altitude > 0 metres; out-of-range values are rejected. " +
+                "Parameters: lat (required), lon (required), alt in metres (required), heading (deg, optional), pitch (deg, optional), duration (seconds, optional), sessionId (optional, omit to target most-recently-active tab). " +
+                "Example: pan_globe({lat:48.8566,lon:2.3522,alt:500000})",
             inputSchema: {
                 lat: latSchema.describe("Latitude in decimal degrees [-90, 90]"),
                 lon: lonSchema.describe("Longitude in decimal degrees [-180, 180]"),
@@ -105,8 +109,11 @@ export function registerGlobeCommandTools(
         "focus_entity",
         {
             description:
-                "Point the globe camera at a geographic coordinate. Provide lat and lon to fly the camera there. " +
-                "entityId is accepted but entity-id-to-coordinate resolution is not yet wired; always include lat/lon for a reliable camera move.",
+                "Point the globe camera at a known entity or coordinate. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
+                "Prefer focus_entity over pan_globe when you have an entity id and want to centre on it; note entity-id-to-coordinate resolution is not yet wired, so always include lat/lon for a reliable camera move. " +
+                "Limitations: latitude [-90, 90], longitude [-180, 180]; entityId alone will not move the camera until resolution is wired. " +
+                "Parameters: entityId (optional, informational), lat (recommended), lon (recommended), sessionId (optional). " +
+                "Example: focus_entity({entityId:\"ship-123\",lat:35.68,lon:139.69})",
             inputSchema: {
                 entityId: z.string().optional().describe("Entity id (informational; coordinate resolution not yet supported -- also provide lat/lon)"),
                 lat: latSchema.optional().describe("Latitude to focus on [-90, 90]"),
@@ -139,7 +146,11 @@ export function registerGlobeCommandTools(
         "toggle_layer",
         {
             description:
-                "Enable or disable a plugin data layer on the globe. Omit 'enabled' to toggle the current state.",
+                "Enable or disable a plugin data layer on the globe. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
+                "Prefer toggle_layer over pan_globe or set_timeline when changing layer visibility, not camera position or playback time. " +
+                "Limitations: layerId must match an installed plugin id; unknown ids are silently ignored by the browser. " +
+                "Parameters: layerId (required), enabled (true/false, optional — omit to toggle current state), sessionId (optional). " +
+                "Example: toggle_layer({layerId:\"ais\",enabled:true})",
             inputSchema: {
                 layerId: z.string().describe("The plugin/layer identifier to toggle"),
                 enabled: z.boolean().optional().describe("True to enable, false to disable, omit to toggle"),
@@ -170,7 +181,11 @@ export function registerGlobeCommandTools(
         "set_timeline",
         {
             description:
-                "Set the globe timeline position, time window, or playback mode.",
+                "Set the globe timeline position, time window, or playback mode. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
+                "Prefer set_timeline over toggle_layer or pan_globe when adjusting time or playback, not layer visibility or camera position. " +
+                "Limitations: currentTime must be ISO 8601; timeWindow must be one of '1h','6h','24h','48h','7d'. " +
+                "Parameters: currentTime (ISO 8601, optional), timeWindow (optional), isPlaybackMode (boolean, optional), sessionId (optional). " +
+                "Example: set_timeline({timeWindow:\"24h\",isPlaybackMode:true})",
             inputSchema: {
                 currentTime: z.string().optional().describe("ISO 8601 datetime to seek to"),
                 timeWindow: z.enum(TIME_WINDOW_VALUES).optional().describe("Time window: one of '1h', '6h', '24h', '48h', '7d'"),

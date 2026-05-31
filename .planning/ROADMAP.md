@@ -111,7 +111,10 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   2. Every data query tool description (`search_entities`, `get_entities_in_region`, `get_entity_details`, `get_plugin_data`) states explicitly what an empty result means -- distinguishing "plugin not loaded" from "no matching data"
   3. Every v1.3 tool description (`geocode_location`, `set_filter`, `clear_filter`, `get_plugin_filters`, `save_favorite`, `list_favorites`, `remove_favorite`) passes the 6-component checklist: purpose, when-to-use, limitations, parameter format, example, complete length
   4. No tool description is truncated at a critical constraint; each fits within MCP client display limits while retaining all mandatory guidance
-**Plans**: TBD
+**Plans**: 3 plans (all wave 1, parallel -- no file overlap)
+- [ ] 27-01-PLAN.md — DESC-01: rewrite 4 globe command tool descriptions (pan_globe, focus_entity, toggle_layer, set_timeline) + assertion tests
+- [ ] 27-02-PLAN.md — DESC-02: rewrite 4 data query tool descriptions with empty-result semantics + new tools.test.ts
+- [ ] 27-03-PLAN.md — DESC-03: conform 8 v1.3 tool descriptions across geocoding/filter/favorites (fly_to gets the sessions precondition) + assertion tests
 
 ### Phase 28: Smart Response Contracts + Favorites CRUD
 **Goal**: Query tools communicate WHY results are empty rather than returning identical empty arrays for unrelated failure modes, and agents can update a saved favorite without deleting and recreating it
@@ -145,7 +148,7 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 | 24. Route Wiring + Version Bump | 1/1 | Complete | 2026-05-31 |
 | 25. Documentation | 1/1 | Complete | 2026-05-31 |
 | 26. Server Instructions + Orientation | 1/1 | Complete   | 2026-05-31 |
-| 27. Tool Description Rewrite | 0/? | Not started | - |
+| 27. Tool Description Rewrite | 0/3 | Planned | - |
 | 28. Smart Response Contracts + Favorites CRUD | 0/? | Not started | - |
 | 29. Compound and Discovery Tools | 0/? | Not started | - |
 
