@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import type { Viewer as CesiumViewer } from "cesium";
 import {
- Cartesian3, EasingFunction, Ellipsoid, Math as CesiumMath, Transforms, Matrix4
+ Cartesian3, EasingFunction, Ellipsoid, Math as CesiumMath, Transforms, Matrix4, Rectangle
 } from "cesium";
 import { dataBus } from "@/core/data/DataBus";
 import { showSearchPin } from "./searchPinAnimation";
@@ -140,9 +140,21 @@ export function useCameraActions(viewer: CesiumViewer | null, isReady: boolean) 
             }, 50);
         });
 
+        const unsubFlyToBbox = dataBus.on("cameraFlyToBbox", ({ west, south, east, north }) => {
+            setTimeout(() => {
+                if (!viewer || viewer.isDestroyed()) return;
+                viewer.camera.flyTo({
+                    destination: Rectangle.fromDegrees(west, south, east, north),
+                    duration: 1.5,
+                    easingFunction: EasingFunction.QUINTIC_IN_OUT,
+                });
+            }, 50);
+        });
+
         return () => {
             unsubFace();
             unsubGoTo();
+            unsubFlyToBbox();
         };
     }, [viewer, isReady]);
 }

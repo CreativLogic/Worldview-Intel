@@ -17,6 +17,19 @@ function dispatchCommand(cmd: GlobeCommand): void {
             });
             break;
 
+        case "flyTo":
+            if (cmd.bbox) {
+                const [west, south, east, north] = cmd.bbox;
+                dataBus.emit("cameraFlyToBbox", { west, south, east, north });
+            } else {
+                dataBus.emit("cameraGoTo", {
+                    lat: cmd.lat,
+                    lon: cmd.lng, // flyTo uses "lng"; cameraGoTo expects "lon" -- explicit mapping per D-03
+                    alt: cmd.alt ?? 15_000,
+                });
+            }
+            break;
+
         case "focusEntity":
             if (cmd.lat !== undefined && cmd.lon !== undefined) {
                 dataBus.emit("cameraGoTo", {
