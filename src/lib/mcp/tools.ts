@@ -42,7 +42,7 @@ export function registerDataQueryTools(server: McpServer): void {
         "search_entities",
         {
             description:
-                "Search for geospatial entities by name across active plugins. Returns up to 20 results with id, name, latitude, longitude, and pluginId. Optionally pass 'filters' keyed by entity property key to return only matching entities (independent of any set_filter state). An empty result (count 0) means no match or no live data, not an error.",
+                "Full-text search for geospatial entities by name across active plugins. Use when you need entities matching a keyword. Limitation: an empty result (count 0) has two distinct causes -- plugin not loaded or not streaming yet (re-call tools/list after the plugin loads), OR no entities matched the query; a future emptyReason field will distinguish these. Returns up to 20 results (id, name, lat, lon, pluginId). Optional 'filters' apply inline property filters independent of set_filter state. Example: search_entities({ query: 'flight', pluginId: 'flights' })",
             inputSchema: {
                 query: z.string().describe("Search query string"),
                 pluginId: z.string().optional().describe("Restrict search to a specific plugin"),
@@ -81,7 +81,7 @@ export function registerDataQueryTools(server: McpServer): void {
         "get_entities_in_region",
         {
             description:
-                "Find entities within a geographic bounding box. Returns up to 100 results. An empty result (count 0) means no match or no live data, not an error.",
+                "Spatial query returning entities within a bounding box (north/south/east/west lat-lon bounds). Use when you need entities in a geographic area. Limitation: an empty result (count 0) has two distinct causes -- plugin not loaded or not streaming yet (re-call tools/list after the plugin loads), OR no entities matched the region; a future emptyReason field will distinguish these. Returns up to 100 results. Example: get_entities_in_region({ north: 52, south: 51, east: 0, west: -1, pluginId: 'flights' })",
             inputSchema: {
                 north: latSchema.describe("Northern latitude bound"),
                 south: latSchema.describe("Southern latitude bound"),
@@ -121,7 +121,7 @@ export function registerDataQueryTools(server: McpServer): void {
         "get_entity_details",
         {
             description:
-                "Get full details for a single entity by pluginId and entityId.",
+                "Single entity lookup returning full detail by pluginId + entityId. Use after search_entities or get_entities_in_region to retrieve complete properties for one entity. Limitation: plugin not loaded or not streaming yet means the entity will not be found even if it exists -- re-call tools/list after the plugin loads; no entities matched returns an error string (not a success envelope); a future emptyReason field will clarify load state. Example: get_entity_details({ pluginId: 'flights', entityId: 'BA123' })",
             inputSchema: {
                 pluginId: z.string().describe("The plugin that owns this entity"),
                 entityId: z.string().describe("The entity identifier"),
@@ -153,7 +153,7 @@ export function registerDataQueryTools(server: McpServer): void {
         "get_plugin_data",
         {
             description:
-                "Get the current data snapshot (all entities) for a named plugin. An empty result (count 0) means no match or no live data, not an error.",
+                "Full data snapshot returning all current entities for one plugin by pluginId. Use to bulk-read a plugin's live state. Limitation: an empty result (count 0) has two distinct causes -- plugin not loaded or not streaming yet (re-call tools/list after the plugin loads), OR no entities matched (plugin loaded but empty); a future emptyReason field will distinguish these. Includes capturedAt timestamp. Example: get_plugin_data({ pluginId: 'earthquakes' })",
             inputSchema: {
                 pluginId: z.string().describe("The plugin identifier"),
             },
