@@ -1,3 +1,5 @@
+import type { FilterValue } from "@/core/plugins/PluginTypes";
+
 // Must stay in sync with the TimeWindow union in @worldwideview/wwv-plugin-sdk.
 export const TIME_WINDOW_VALUES = ["1h", "6h", "24h", "48h", "7d"] as const;
 export type TimeWindowLiteral = (typeof TIME_WINDOW_VALUES)[number];
@@ -7,7 +9,9 @@ export type GlobeCommand =
     | { type: "focusEntity"; entityId?: string; lat?: number; lon?: number }
     | { type: "toggleLayer"; layerId: string; enabled?: boolean }
     | { type: "setTimeline"; currentTime?: string; timeWindow?: TimeWindowLiteral; isPlaybackMode?: boolean }
-    | { type: "flyTo"; lat: number; lng: number; alt?: number; bbox?: [number, number, number, number] };
+    | { type: "flyTo"; lat: number; lng: number; alt?: number; bbox?: [number, number, number, number] }
+    | { type: "setFilter"; pluginId: string; filters: Record<string, FilterValue> }
+    | { type: "clearFilter"; pluginId?: string };
 
 function isNumber(v: unknown): v is number {
     return typeof v === "number" && isFinite(v);
@@ -57,6 +61,23 @@ function isValidDateString(v: unknown): boolean {
 
 function isOptionalDateString(v: unknown): boolean {
     return v === undefined || isValidDateString(v);
+}
+
+function isValidFilterValue(v: unknown): v is FilterValue {
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return false;
+    const fv = v as Record<string, unknown>;
+    switch (fv["type"]) {
+        case "text":
+            return typeof fv["value"] === "string";
+        case "select":
+            return Array.isArray(fv["values"]) && fv["values"].every((x) => typeof x === "string");
+        case "range":
+            return isNumber(fv["min"]) && isNumber(fv["max"]);
+        case "boolean":
+            return typeof fv["value"] === "boolean";
+        default:
+            return false;
+    }
 }
 
 export function isValidGlobeCommand(obj: unknown): obj is GlobeCommand {
@@ -113,6 +134,16 @@ export function isValidGlobeCommand(obj: unknown): obj is GlobeCommand {
             }
             return true;
         }
+
+        case "setFilter": {
+            if (typeof cmd["pluginId"] !== "string" || cmd["pluginId"] === "") return false;
+            const filters = cmd["filters"];
+            if (filters === null || typeof filters !== "object" || Array.isArray(filters)) return false;
+            return Object.values(filters as Record<string, unknown>).every(isValidFilterValue);
+        }
+
+        case "clearFilter":
+            return isOptionalString(cmd["pluginId"]);
 
         default:
             return false;

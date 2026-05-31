@@ -24,7 +24,7 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 ### v1.3 Location Intelligence
 
-- [ ] **Phase 22: Geocoding + Favorites** - Geocode places, fly the globe, bookmark tracked entities
+- [x] **Phase 22: Geocoding + Favorites** - Geocode places, fly the globe, bookmark tracked entities (4/4 plans, verified 2026-05-31)
 - [ ] **Phase 23: Entity Filtering** - Push live filters to the globe and query plugin-declared filter schemas
 - [ ] **Phase 24: Route Wiring + Version Bump** - Wire all v1.3 registrars into the MCP handler and ship MCP_SERVER_VERSION 1.3.0
 - [ ] **Phase 25: Documentation** - MCP tool docs, plugin author filter guide, user-facing capability summary, and v1.3 release notes
@@ -52,7 +52,10 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   2. Agent calls `clear_filter()` with no arguments and all active plugin filters are removed from the globe in one command
   3. Agent calls `get_plugin_filters("flights")` and receives the filterable fields declared in that plugin's session catalog entry
   4. Agent passes `filters` to the existing `search_entities` call and receives only matching results, with no dependency on prior `set_filter` state
-**Plans**: TBD
+**Plans**: 3 plans (ships atomically per STATE.md)
+- [ ] 23-01-PLAN.md — Foundation: GlobeCommand setFilter/clearFilter variants + validator, bridge dispatch into filterSlice, shared filterValueSchema, matchFilterValue extraction, catalog filterDefinitions, RED tool stubs (wave 1, TDD)
+- [ ] 23-02-PLAN.md — Filter MCP tools (set_filter, clear_filter, get_plugin_filters), search_entities filters param on properties, catalog publisher emits filterDefinitions (wave 2, TDD)
+- [ ] 23-03-PLAN.md — Wire registerFilterTools into the MCP route + atomic phase integration verification (wave 3)
 
 ### Phase 24: Route Wiring + Version Bump
 **Goal**: All v1.3 tools are reachable via the production MCP endpoint and the server self-reports version 1.3.0
@@ -79,8 +82,8 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 22. Geocoding + Favorites | 1/4 | In Progress|  |
-| 23. Entity Filtering | 0/? | Not started | - |
+| 22. Geocoding + Favorites | 4/4 | Complete ✓ | 2026-05-31 |
+| 23. Entity Filtering | 0/3 | Planned | - |
 | 24. Route Wiring + Version Bump | 0/? | Not started | - |
 | 25. Documentation | 0/? | Not started | - |
 

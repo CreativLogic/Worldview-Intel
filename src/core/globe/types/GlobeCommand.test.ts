@@ -196,3 +196,71 @@ describe("flyTo validator", () => {
         expect(isValidGlobeCommand({ type: "flyTo", lat: 0, lng: 0, bbox: ["west", 50, 1, 52] })).toBe(false);
     });
 });
+
+describe("setFilter / clearFilter validator", () => {
+    it("accepts setFilter with a select filter value", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { status: { type: "select", values: ["airborne"] } } })
+        ).toBe(true);
+    });
+
+    it("accepts setFilter with a range filter value", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { alt: { type: "range", min: 0, max: 1000 } } })
+        ).toBe(true);
+    });
+
+    it("accepts setFilter with a boolean filter value", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { live: { type: "boolean", value: true } } })
+        ).toBe(true);
+    });
+
+    it("accepts setFilter with a text filter value", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { name: { type: "text", value: "ba" } } })
+        ).toBe(true);
+    });
+
+    it("rejects setFilter with an empty pluginId", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "", filters: {} })
+        ).toBe(false);
+    });
+
+    it("rejects setFilter when select values is not an array", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { x: { type: "select", values: "nope" } } })
+        ).toBe(false);
+    });
+
+    it("rejects setFilter when range min is not a number", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { x: { type: "range", min: "0", max: 1 } } })
+        ).toBe(false);
+    });
+
+    it("rejects setFilter with an unknown filter type", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: { x: { type: "bogus" } } })
+        ).toBe(false);
+    });
+
+    it("rejects setFilter when filters is not an object", () => {
+        expect(
+            isValidGlobeCommand({ type: "setFilter", pluginId: "flights", filters: null })
+        ).toBe(false);
+    });
+
+    it("accepts clearFilter with no pluginId (clear all)", () => {
+        expect(isValidGlobeCommand({ type: "clearFilter" })).toBe(true);
+    });
+
+    it("accepts clearFilter with a pluginId", () => {
+        expect(isValidGlobeCommand({ type: "clearFilter", pluginId: "flights" })).toBe(true);
+    });
+
+    it("rejects clearFilter when pluginId is not a string", () => {
+        expect(isValidGlobeCommand({ type: "clearFilter", pluginId: 123 })).toBe(false);
+    });
+});
