@@ -2,19 +2,43 @@ import {
     describe, it, expect, vi, beforeEach,
 } from "vitest";
 import type { GeoEntity } from "@worldwideview/wwv-plugin-sdk";
+import type { PluginDataSnapshot } from "@/lib/data-query/types";
 import {
     searchEntities,
     getEntitiesInRegion,
     getEntityDetails,
     getPluginData,
+    fetchPluginSnapshot,
+    getAllPluginSnapshots,
 } from "@/lib/data-query/service";
 
-// Module does not exist yet — this file is intentionally RED (Wave 0 TDD scaffold)
+// ---------------------------------------------------------------------------
+// Mock the local registry module (Plan 30-02 exports).
+// Default: hasLocalSource → false so existing tests are unaffected.
+// Per-test overrides use mockResolvedValue / mockReturnValue as needed.
+// ---------------------------------------------------------------------------
+
+vi.mock("@/lib/data-query/localSources", () => ({
+    hasLocalSource: vi.fn().mockResolvedValue(false),
+    getLocalSourceIds: vi.fn().mockResolvedValue(new Set<string>()),
+    resolveLocalSnapshot: vi.fn().mockResolvedValue(null),
+}));
+
+// Import mocked fns so we can override per-test.
+import {
+    hasLocalSource,
+    getLocalSourceIds,
+    resolveLocalSnapshot,
+} from "@/lib/data-query/localSources";
 
 global.fetch = vi.fn();
 
 beforeEach(() => {
     vi.resetAllMocks();
+    // Re-apply safe defaults after resetAllMocks clears all mock state.
+    vi.mocked(hasLocalSource).mockResolvedValue(false);
+    vi.mocked(getLocalSourceIds).mockResolvedValue(new Set<string>());
+    vi.mocked(resolveLocalSnapshot).mockResolvedValue(null);
 });
 
 // ---------------------------------------------------------------------------
@@ -313,5 +337,204 @@ describe("getPluginData", () => {
         );
         const result = await getPluginData("test-plugin");
         expect(result.data?.entities[0].timestamp).toBeInstanceOf(Date);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Plan 30-03 Wave 3 — registry fallback (D-08)
+// These tests are RED until Task 2 wires the fallback into service.ts.
+// ---------------------------------------------------------------------------
+
+// Helper: build a minimal camera snapshot for local registry tests.
+function makeCameraSnapshot(entities: GeoEntity[]): PluginDataSnapshot {
+    return { pluginId: "camera", entities, timestamp: new Date() };
+}
+
+// ---------------------------------------------------------------------------
+// Registry fallback — engine-404 + registry hit → non-null snapshot
+// ---------------------------------------------------------------------------
+
+describe("registry fallback (D-08)", () => {
+    it("fetchPluginSnapshot returns non-null when engine 404s and local registry has plugin", async () => {
+        // Engine 404 for camera.
+        mockEngine404();
+        // Local registry knows about camera and returns a snapshot.
+        vi.mocked(hasLocalSource).mockResolvedValue(true);
+        vi.mocked(resolveLocalSnapshot).mockResolvedValue(
+            makeCameraSnapshot([makeEntity({ id: "cam-1", pluginId: "camera", latitude: 55.7, longitude: 37.6 })]),
+        );
+
+        const result = await fetchPluginSnapshot("camera");
+
+        expect(result).not.toBeNull();
+        expect(result?.pluginId).toBe("camera");
+        expect(result?.entities).toHaveLength(1);
+        expect(result?.entities[0].id).toBe("cam-1");
+    });
+
+    it("fetchPluginSnapshot returns null when engine 404s and registry has no entry", async () => {
+        mockEngine404();
+        vi.mocked(hasLocalSource).mockResolvedValue(false);
+
+        const result = await fetchPluginSnapshot("unknown-plugin");
+
+        expect(result).toBeNull();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Russia-bbox acceptance demo — camera via local registry only, no browser
+// ---------------------------------------------------------------------------
+
+describe("Russia bbox acceptance demo", () => {
+    it("getEntitiesInRegion with camera pluginId returns in-box cameras, emptyReason undefined", async () => {
+        // Engine 404 — no streaming engine needed.
+        mockEngine404();
+        // Local registry provides camera snapshot with one in-box and one out-of-box entity.
+        const inBoxCamera = makeEntity({ id: "moscow-cam", pluginId: "camera", latitude: 55.7, longitude: 37.6 });
+        const outOfBoxCamera = makeEntity({ id: "berlin-cam", pluginId: "camera", latitude: 52.5, longitude: 13.4 });
+        vi.mocked(hasLocalSource).mockResolvedValue(true);
+        vi.mocked(resolveLocalSnapshot).mockResolvedValue(
+            makeCameraSnapshot([inBoxCamera, outOfBoxCamera]),
+        );
+
+        // Russia-ish bbox: Europe-to-Pacific, roughly 41-82 N, 19-180 E.
+        const result = await getEntitiesInRegion({
+            north: 82,
+            south: 41,
+            west: 19,
+            east: 180,
+            pluginId: "camera",
+        });
+
+        expect(result.entities.length).toBeGreaterThanOrEqual(1);
+        // Moscow cam is inside the box (lat 55.7, lon 37.6).
+        expect(result.entities.some((e) => e.id === "moscow-cam")).toBe(true);
+        // Berlin cam is outside the box (lon 13.4 < west 19).
+        expect(result.entities.some((e) => e.id === "berlin-cam")).toBe(false);
+        // No emptyReason when entities are found.
+        expect(result.emptyReason).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// D-06 emptyReason contract — RESP-01 must not regress
+// ---------------------------------------------------------------------------
+
+describe("D-06 emptyReason contract (RESP-01)", () => {
+    it("unknown pluginId (engine 404 + not in registry) → plugin_not_streaming", async () => {
+        mockEngine404();
+        vi.mocked(hasLocalSource).mockResolvedValue(false);
+
+        const result = await getEntitiesInRegion({
+            north: 82, south: 41, west: 19, east: 180,
+            pluginId: "nope",
+        });
+
+        expect(result.entities).toEqual([]);
+        expect(result.emptyReason).toBe("plugin_not_streaming");
+    });
+
+    it("registered camera plugin with bbox containing none of its entities → no_data_matches", async () => {
+        // Engine 404, registry has camera but its entities are all outside the query box.
+        mockEngine404();
+        const farAwayCamera = makeEntity({ id: "sydney-cam", pluginId: "camera", latitude: -33.8, longitude: 151.2 });
+        vi.mocked(hasLocalSource).mockResolvedValue(true);
+        vi.mocked(resolveLocalSnapshot).mockResolvedValue(makeCameraSnapshot([farAwayCamera]));
+
+        // Query a box in Scandinavia — no camera entities are inside it.
+        const result = await getEntitiesInRegion({
+            north: 71, south: 55, west: 5, east: 30,
+            pluginId: "camera",
+        });
+
+        expect(result.entities).toEqual([]);
+        expect(result.emptyReason).toBe("no_data_matches");
+    });
+
+    it("unknown pluginId via searchEntities → plugin_not_streaming", async () => {
+        mockEngine404();
+        vi.mocked(hasLocalSource).mockResolvedValue(false);
+
+        const result = await searchEntities("anything", "nope");
+
+        expect(result.entities).toEqual([]);
+        expect(result.emptyReason).toBe("plugin_not_streaming");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// getAllPluginSnapshots union — local ids are merged with engine ids (D-08)
+// ---------------------------------------------------------------------------
+
+describe("getAllPluginSnapshots union", () => {
+    it("includes camera snapshot from local registry when engine manifest omits it", async () => {
+        // Engine manifest returns ["flights"]; local registry adds "camera".
+        const flightEntity = makeEntity({ id: "f1", pluginId: "flights", latitude: 51, longitude: 0 });
+        const cameraEntity = makeEntity({ id: "cam-1", pluginId: "camera", latitude: 55.7, longitude: 37.6 });
+
+        vi.mocked(global.fetch).mockImplementation((url: RequestInfo | URL) => {
+            const urlStr = String(url);
+            if (urlStr.includes("/manifest")) {
+                return Promise.resolve(
+                    new Response(JSON.stringify({ plugins: ["flights"] }), { status: 200 }),
+                );
+            }
+            if (urlStr.includes("/api/flights")) {
+                return Promise.resolve(
+                    new Response(JSON.stringify({ items: [flightEntity] }), { status: 200 }),
+                );
+            }
+            // camera hits engine → 404, falls through to registry.
+            return Promise.resolve(new Response(null, { status: 404 }));
+        });
+
+        vi.mocked(getLocalSourceIds).mockResolvedValue(new Set(["camera"]));
+        vi.mocked(hasLocalSource).mockResolvedValue(true);
+        vi.mocked(resolveLocalSnapshot).mockResolvedValue(makeCameraSnapshot([cameraEntity]));
+
+        const snapshots = await getAllPluginSnapshots();
+
+        const pluginIds = snapshots.map((s) => s.pluginId);
+        expect(pluginIds).toContain("flights");
+        expect(pluginIds).toContain("camera");
+        // No duplicate camera entry.
+        expect(pluginIds.filter((id) => id === "camera")).toHaveLength(1);
+    });
+
+    it("engine-first dedup: camera in both engine and registry resolves to engine snapshot", async () => {
+        // Engine manifest includes "camera" AND registry also lists it.
+        // Engine wins — only one camera snapshot, from the engine.
+        const engineCameraEntity = makeEntity({ id: "engine-cam", pluginId: "camera", latitude: 10, longitude: 20 });
+        const localCameraEntity = makeEntity({ id: "local-cam", pluginId: "camera", latitude: 55.7, longitude: 37.6 });
+
+        vi.mocked(global.fetch).mockImplementation((url: RequestInfo | URL) => {
+            const urlStr = String(url);
+            if (urlStr.includes("/manifest")) {
+                return Promise.resolve(
+                    new Response(JSON.stringify({ plugins: ["camera"] }), { status: 200 }),
+                );
+            }
+            if (urlStr.includes("/api/camera")) {
+                return Promise.resolve(
+                    new Response(JSON.stringify({ items: [engineCameraEntity] }), { status: 200 }),
+                );
+            }
+            return Promise.resolve(new Response(null, { status: 404 }));
+        });
+
+        // Registry also claims camera is local.
+        vi.mocked(getLocalSourceIds).mockResolvedValue(new Set(["camera"]));
+        // hasLocalSource won't be called because engine returns a snapshot first.
+        vi.mocked(hasLocalSource).mockResolvedValue(true);
+        vi.mocked(resolveLocalSnapshot).mockResolvedValue(makeCameraSnapshot([localCameraEntity]));
+
+        const snapshots = await getAllPluginSnapshots();
+
+        const cameraSnapshots = snapshots.filter((s) => s.pluginId === "camera");
+        // Only one camera snapshot.
+        expect(cameraSnapshots).toHaveLength(1);
+        // It came from the engine (engine-cam), not the local registry (local-cam).
+        expect(cameraSnapshots[0].entities[0].id).toBe("engine-cam");
     });
 });
