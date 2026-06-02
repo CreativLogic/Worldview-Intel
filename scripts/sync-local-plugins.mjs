@@ -325,6 +325,10 @@ export function syncToPublic({ dir, manifest, pluginDir }, { quiet = false } = {
         category: manifest.category || "custom",
         icon: manifest.icon || "Box",
         entry: `/plugins-local/${publicName}/frontend.mjs`,
+        // Carry localData declarations into the generated manifest so the
+        // server-side LocalDataSource registry can discover them at runtime
+        // without reading raw package.json files (Phase 30, D-02/Area 2).
+        ...(manifest.localData ? { localData: manifest.localData } : {}),
     };
 
     fs.writeFileSync(
