@@ -24,7 +24,7 @@ export interface IconUrlOptions extends Record<string, unknown> {
  * Pass `{ background: false }` to opt out.
  */
 export declare function createSvgIconUrl(Icon: ComponentType<any>, opts?: IconUrlOptions): string;
-export type { PluginManifest, PluginFormat, PluginType, TrustTier, PluginCapability, DataSourceConfig, FieldMapping, RenderingConfig } from "./manifest";
+export type { PluginManifest, PluginFormat, PluginType, TrustTier, PluginCapability, DataSourceConfig, FieldMapping, RenderingConfig, McpToolDeclaration } from "./manifest";
 export type PluginCategory = "aviation" | "maritime" | "military" | "conflict" | "natural-disaster" | "infrastructure" | "space" | "cyber" | "economic" | "intelligence" | "custom";
 export interface TimeRange {
     start: Date;
@@ -241,6 +241,17 @@ export interface WorldPlugin {
     requiresConfiguration?(settings: unknown): boolean;
     /** Map raw websocket payload into GeoEntity array. Optional existingEntities is provided so plugins can merge state (e.g. historical trails). */
     mapWebsocketPayload?(payload: any, existingEntities?: GeoEntity[]): GeoEntity[];
+    /**
+     * Execute an MCP tool in the browser on behalf of the server relay.
+     * The server dispatches the invocation here; the plugin runs the logic
+     * and returns the result. The server NEVER executes plugin tools directly
+     * (v3 frontend-relay design).
+     *
+     * @param toolName - The bare tool name (not namespaced).
+     * @param args - Validated arguments from the MCP client.
+     * @returns Arbitrary result serializable to JSON.
+     */
+    executeMcpTool?(toolName: string, args: Record<string, unknown>): Promise<unknown>;
 }
 export type GlobePlugin = WorldPlugin;
 export type DataBusEvents = {
@@ -288,6 +299,12 @@ export type DataBusEvents = {
         maxPitch?: number;
         heading?: number;
     };
+    cameraFlyToBbox: {
+        west: number;
+        south: number;
+        east: number;
+        north: number;
+    };
     globeReady: Record<string, never>;
     pluginError: {
         pluginId?: string;
@@ -301,4 +318,29 @@ export type DataBusEvents = {
 };
 export * from "./viteGlobals";
 export * from "./auth-contracts";
+/**
+ * Wraps an ISO 8601 date string for rich rendering in the Intel panel.
+ * The panel displays local time (collapsed) and UTC + relative time (expanded).
+ * @param iso - ISO 8601 string (e.g. "2026-06-01T05:00:00Z"), or null/undefined
+ * @returns Tagged string `"datetime:{iso}"`, or `null` if input is empty
+ */
+export declare function dtProp(iso: string | undefined | null): string | null;
+/**
+ * Wraps a URL for rich rendering in the Intel panel as a clickable external link.
+ * @param href - Any URL string, or null/undefined
+ * @returns Tagged string `"url:{href}"`, or `null` if input is empty
+ */
+export declare function urlProp(href: string | undefined | null): string | null;
+/**
+ * Wraps an image URL for rich rendering in the Intel panel as an inline thumbnail.
+ * @param src - Image URL string, or null/undefined
+ * @returns Tagged string `"image:{src}"`, or `null` if input is empty
+ */
+export declare function imageProp(src: string | undefined | null): string | null;
+/**
+ * Wraps a video or stream URL for rich rendering in the Intel panel as a "Watch" link.
+ * @param href - Video or stream URL string, or null/undefined
+ * @returns Tagged string `"video:{href}"`, or `null` if input is empty
+ */
+export declare function videoProp(href: string | undefined | null): string | null;
 //# sourceMappingURL=index.d.ts.map

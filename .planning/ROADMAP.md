@@ -77,7 +77,7 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
   2. MCP server `serverInfo.version` field returns `"1.3.0"` on every initialize handshake
   3. `search_entities` with optional `filters` param is reflected in the tool schema exposed to clients
 **Plans**: 24-01 (COMPLETE) - INTG-01 verified, INTG-02 shipped (MCP_SERVER_VERSION 1.3.0)
-**Status**: COMPLETE 2026-05-31. tsc clean, 750 Vitest tests GREEN (+12), build OK. Commits 5201ae3, 5ea7855.
+**Status**: COMPLETE 2026-05-31. tsc clean, 750 Vitest tests GREEN, build OK. Commits 5201ae3, 5ea7855.
 
 ### Phase 25: Documentation
 **Goal**: Every v1.3 feature is fully documented for three audiences: MCP clients (tool schemas), plugin developers (filter manifest guide), and end users (capability summary)
@@ -155,6 +155,7 @@ Full details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 | 27. Tool Description Rewrite | 3/3 | Complete   | 2026-05-31 |
 | 28. Smart Response Contracts + Favorites CRUD | 3/3 | Complete   | 2026-05-31 |
 | 29. Compound and Discovery Tools | 1/1 | Complete   | 2026-05-31 |
+| 30. Local Data-Source Bridge | 0/4 | Planned | - |
 
 ## Backlog
 
@@ -179,3 +180,16 @@ Also tracked as partials (functional, refinement deferred):
 - **MCP-QA-03** explicit Redis reconnect test -- stateless SSE arch makes the original
   WebSocket-subscriber spec N/A; ioredis auto-reconnects. Add a reconnect test if reliability
   concerns arise.
+
+### Phase 30: Local Data-Source Bridge: make server-reachable client-side and static plugins (camera GeoJSON, OSM-static plugins) queryable via MCP through a generalized LocalDataSource registry. Closes the MCP coverage gap where browser-loaded plugins return plugin_not_streaming. Camera is the first consumer.
+
+**Goal:** Server-reachable client-side/static plugins (camera GeoJSON + traffic route) are MCP-queryable through a generalized manifest-declared LocalDataSource registry, with NO browser session -- closing the plugin_not_streaming coverage gap. Acceptance: a Russia-bbox `get_entities_in_region(pluginId:"camera")` returns the in-box cameras and `list_available_plugins` lists camera as `source:"local"` with a non-zero count.
+**Requirements**: D-01..D-08 (CONTEXT decisions), RESP-01 (emptyReason contract preserved), TOOL-01/TOOL-02 (discovery surface)
+**Depends on:** Phase 29
+**Plans:** 4 plans
+
+Plans:
+- [ ] 30-01-PLAN.md — Foundation: SDK LocalDataSourceDeclaration type + camera package.json localData declaration + sync-local-plugins passthrough + validateManifest localData validator (wave 1, TDD)
+- [ ] 30-02-PLAN.md — localSources module: manifest-driven registry + server-side GeoJSON normalizer + per-source TTL cache (wave 2, TDD)
+- [ ] 30-03-PLAN.md — Integration seam: fetchPluginSnapshot engine->local->null fallback + getAllPluginSnapshots local-id union; Russia-bbox demo + D-06 emptyReason cases (wave 3, TDD)
+- [ ] 30-04-PLAN.md — Discovery surface: StreamingPlugin source:"engine"|"local" tag in listStreamingPlugins; camera surfaced in list_available_plugins/get_globe_context (wave 4, TDD)

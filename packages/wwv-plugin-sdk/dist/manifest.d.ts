@@ -50,6 +50,51 @@ export interface RenderingConfig {
     maxEntities?: number;
 }
 /**
+ * @interface McpToolDeclaration
+ * @description A single MCP tool declared by a plugin.
+ * The server uses this declaration to compose tools/list and dispatch
+ * invocations to the browser. The server NEVER executes plugin tools
+ * directly (v3 frontend-relay design).
+ *
+ * INVARIANT: No `execution` field. The browser (WorldPlugin.executeMcpTool)
+ * is the sole execution site.
+ */
+export interface McpToolDeclaration {
+    /** Safe identifier. Only [a-zA-Z0-9_-] characters are allowed. */
+    name: string;
+    /** Human-readable description for MCP clients. */
+    description: string;
+    /**
+     * Minimal JSON-schema-like object describing the tool arguments.
+     * Supports: type, properties, required, enum (per validateToolArgs).
+     */
+    inputSchema: {
+        type: "object";
+        properties?: Record<string, {
+            type: string;
+            enum?: string[];
+        }>;
+        required?: string[];
+    };
+}
+/**
+ * @interface LocalDataSourceDeclaration
+ * @description A single server-reachable data source declared by a plugin.
+ * Plugins opt in to server-side data querying by listing entries in the
+ * `localData` array of their package.json `worldwideview` block. The sync
+ * script carries these declarations into the generated plugin.json so the
+ * LocalDataSource registry can discover them at runtime without a browser
+ * session (D-02, D-03, D-08 -- Phase 30).
+ */
+export interface LocalDataSourceDeclaration {
+    /** Distinct name per source within a plugin (e.g. "default", "traffic"). */
+    name: string;
+    /** "geojson" = static FeatureCollection file; "route" = internal Next.js API route. */
+    type: "geojson" | "route";
+    /** Server-relative path. Must start with "/". Both types are server-reachable. */
+    path: string;
+}
+/**
  * @interface PluginManifest
  * @description The structural definition of a plugin.json file.
  */
@@ -77,5 +122,25 @@ export interface PluginManifest {
     entry?: string;
     assets?: string[];
     extends?: string[];
+    /**
+     * MCP tools this plugin declares (v3 frontend-relay design).
+     * The server reads these to compose tools/list and dispatch invocations
+     * to the browser. Execution always happens in the browser via
+     * WorldPlugin.executeMcpTool.
+     */
+    mcpTools?: McpToolDeclaration[];
+    /**
+     * Opaque capability tags for MCP clients (e.g. "point-layer", "camera-control").
+     * Must be a string array when present.
+     */
+    mcpCapabilities?: string[];
+    /**
+     * Server-reachable data sources declared by this plugin (Phase 30, D-02/D-03).
+     * When present, the LocalDataSource registry serves this plugin's data
+     * server-side so MCP query tools work without a browser session. Each
+     * entry names a distinct source (e.g. "default", "traffic") and specifies
+     * its type and server-relative path. Paths must start with "/".
+     */
+    localData?: LocalDataSourceDeclaration[];
 }
 //# sourceMappingURL=manifest.d.ts.map

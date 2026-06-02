@@ -34,6 +34,10 @@ var __rest = (this && this.__rest) || function (s, e) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DEFAULT_ICON_SIZE = void 0;
 exports.createSvgIconUrl = createSvgIconUrl;
+exports.dtProp = dtProp;
+exports.urlProp = urlProp;
+exports.imageProp = imageProp;
+exports.videoProp = videoProp;
 const react_1 = require("react");
 const server_1 = require("react-dom/server");
 /** Standard SVG icon size (px) used by createSvgIconUrl when no size is given. */
@@ -67,3 +71,45 @@ function createSvgIconUrl(Icon, opts = {}) {
 __exportStar(require("./viteGlobals"), exports);
 // ─── Auth Contracts ──────────────────────────────────────────
 __exportStar(require("./auth-contracts"), exports);
+// ─── Tagged Property Helpers ─────────────────────────────────
+/**
+ * Wraps an ISO 8601 date string for rich rendering in the Intel panel.
+ * The panel displays local time (collapsed) and UTC + relative time (expanded).
+ * @param iso - ISO 8601 string (e.g. "2026-06-01T05:00:00Z"), or null/undefined
+ * @returns Tagged string `"datetime:{iso}"`, or `null` if input is empty
+ */
+function dtProp(iso) {
+    if (!iso)
+        return null;
+    return `datetime:${iso}`;
+}
+/**
+ * Wraps a URL for rich rendering in the Intel panel as a clickable external link.
+ * @param href - Any URL string, or null/undefined
+ * @returns Tagged string `"url:{href}"`, or `null` if input is empty
+ */
+function urlProp(href) {
+    if (!href)
+        return null;
+    return `url:${href}`;
+}
+/**
+ * Wraps an image URL for rich rendering in the Intel panel as an inline thumbnail.
+ * @param src - Image URL string, or null/undefined
+ * @returns Tagged string `"image:{src}"`, or `null` if input is empty
+ */
+function imageProp(src) {
+    if (!src)
+        return null;
+    return `image:${src}`;
+}
+/**
+ * Wraps a video or stream URL for rich rendering in the Intel panel as a "Watch" link.
+ * @param href - Video or stream URL string, or null/undefined
+ * @returns Tagged string `"video:{href}"`, or `null` if input is empty
+ */
+function videoProp(href) {
+    if (!href)
+        return null;
+    return `video:${href}`;
+}
