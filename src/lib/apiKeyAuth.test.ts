@@ -20,6 +20,9 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/core/edition", () => ({
     isDemo: false,
+    edition: "local",
+    isLocal: true,
+    isCloud: false,
 }));
 
 // AUTH_SECRET must be set so getSigningKey() does not throw in the test env
@@ -154,6 +157,17 @@ describe("authenticateApiKey", () => {
         // timingSafeEqual must have been called: both the miss path and the hit
         // path produce equal-length (32-byte) buffers from hex digests, so the
         // compare is well-defined and does not throw.
+    });
+
+    it("returns null (does not throw) when Prisma findUnique rejects (DB outage — TRANS-02)", async () => {
+        vi.mocked(prisma.userApiKey.findUnique).mockRejectedValue(
+            new Error("Connection refused")
+        );
+        const req = new Request("http://localhost/api/test", {
+            headers: { authorization: "Bearer wwv_XXXXXXXX.fakesecret" },
+        });
+        // Must resolve to null, not reject
+        await expect(authenticateApiKey(req)).resolves.toBeNull();
     });
 
     it("hashedSecret is never returned to callers — result only contains userId and keyId", async () => {

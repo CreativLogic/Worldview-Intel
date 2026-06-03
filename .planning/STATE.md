@@ -1,38 +1,63 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: Agentic Intelligence
-status: verifying
-last_updated: "2026-06-02T04:43:48.134Z"
-last_activity: 2026-06-02
+milestone: v1.5
+milestone_name: MCP Public-Launch Hardening
+status: complete
+last_updated: "2026-06-03T16:05:00.000Z"
+last_activity: 2026-06-03
 progress:
-  total_phases: 9
-  completed_phases: 8
-  total_plans: 22
-  completed_plans: 21
-  percent: 89
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 0
+  completed_plans: 0
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-31)
+See: .planning/PROJECT.md (updated 2026-06-03)
 
-**Core value:** A single globe controllable by any AI agent via MCP -- where the agent arrives oriented, investigates intelligently, and acts with confidence.
-**Current focus:** Phase 30 — local-data-source-bridge-make-server-reachable-client-side-a
+**Core value:** A single globe that shows everything happening in the world right now, extensible by anyone via plugins, and controllable by any AI agent via MCP.
+**Current focus:** v1.5 MCP Public-Launch Hardening (Phases 31-36) -- closing premortem blockers that make the MCP server unsafe or dishonest to expose to untrusted, authenticated public users.
 
 ## Current Position
 
-Phase: 30 (local-data-source-bridge-make-server-reachable-client-side-a) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-06-02
-Resume file: None
+Phase: 36 — Onboarding and Framing (complete)
+Plan: —
+Status: All 6 phases (31-36) complete and committed; milestone v1.5 done
+Last activity: 2026-06-03 — Phase 36 Onboarding and Framing shipped (ONBRD-01..03), gate green (1004 tests), v2.48.9
 
-Progress: [██████████] 95%
+## Completed Phases (v1.5)
 
-## v1.4 Phase Map
+| Phase | Result | Commit |
+|-------|--------|--------|
+| 31 Transport Resilience | tsc + 916 tests + build green; security SAFE | 121f7b22 |
+| 32 Security and Abuse-Resistance | tsc + 967 tests + build green; security MERGE-WITH-FIXES resolved | 3fd23473 |
+| 33 Tool Honesty and Agent UX | tsc + 983 tests + build green; TOOL-01 live-verified (no_data_matches) | 813d2b28 |
+| 34 Observability | tsc + tests + build green; /api/health probes redis/db/engine/config | b95ff5d5 |
+| 35 Deployment Wiring | tsc + 1004 tests + build green; security MERGE-WITH-FIXES resolved (Redis auth, AUTH_SECRET, pg loopback) | 0f860185 |
+| 36 Onboarding and Framing | tsc + 1004 tests + build green; quickstart + prerequisites + SESSION_REQUIRED_PREAMBLE on all 7 command tools | a5fade97 |
+
+## v1.5 Phase Map
+
+| Phase | Goal | Key requirements |
+|-------|------|-----------------|
+| 31 | Transport Resilience | TRANS-01, TRANS-02, TRANS-03, TRANS-04 |
+| 32 | Security and Abuse-Resistance | SEC-01, SEC-02, SEC-03, SEC-04 |
+| 33 | Tool Honesty and Agent UX | TOOL-01, TOOL-02, TOOL-03, TOOL-04, TOOL-05 |
+| 34 | Observability | OBS-01 |
+| 35 | Deployment Wiring | DEPLOY-01, DEPLOY-02, DEPLOY-03, DEPLOY-04 |
+| 36 | Onboarding and Framing | ONBRD-01, ONBRD-02, ONBRD-03 |
+
+**Coverage:** 21/21 v1.5 requirements mapped, 0 orphaned.
+
+**Phase numbering:** v1.5 starts at Phase 31 (v1.4 ended at Phase 30).
+
+**Locked decision:** Command/control tools keep current behavior (they require a live signed-in browser session to drive the globe); a headless/render-on-demand globe is out of scope (deferred).
+
+## v1.4 Phase Map (archived reference)
 
 | Phase | Goal | Key requirements |
 |-------|------|-----------------|
@@ -40,26 +65,19 @@ Progress: [██████████] 95%
 | 27 | Tool Description Rewrite | DESC-01, DESC-02, DESC-03 |
 | 28 | Smart Response Contracts + Favorites CRUD | RESP-01, RESP-02, CRUD-01 |
 | 29 | Compound and Discovery Tools | TOOL-01, TOOL-02, TOOL-03 |
+| 30 | Local Data-Source Bridge | D-01..D-08, RESP-01, TOOL-01, TOOL-02 |
 
-## Key Decisions (carried from v1.2/v1.3)
+## Key Decisions (carried from v1.2/v1.3/v1.4)
 
 - **MCP transport:** Stateless Streamable HTTP at /api/mcp; raw @modelcontextprotocol/sdk; Bearer auth via authenticateApiKey(). No custom server.ts.
 - **Redis for ephemeral state:** Globe state, command queues, session catalogs all in Redis. PostgreSQL for user-owned persistent data.
-- **SSE command bridge:** EventSource-based push (GET /api/globe/commands/stream). Reuse for fly_to in v1.3.
-- **Plugin tools via frontend relay:** No engine endpoint. useMcpCatalogPublisher + useMcpRelayBridge pattern.
+- **SSE command bridge:** EventSource-based push (GET /api/globe/commands/stream).
+- **Plugin tools via frontend relay:** No engine endpoint. useMcpCatalogPublisher + useMcpRelayBridge pattern; plugin-relay blpop has a 10s window (relevant to TRANS-03 maxDuration).
 - **Three editions:** NEXT_PUBLIC_WWV_EDITION (local/cloud/demo). isDemo gate runs before auth on all new endpoints.
-- **Generic API keys:** wwv_prefix.secret bearer tokens. authenticateApiKey() middleware reused for all new MCP tools.
-- **LocalDataSource registry (Phase 30-02):** Scans public/plugins-local/<id>/plugin.json at startup; memoized once per process. Per-source TTL cache: TTL_GEOJSON_MS=60min, TTL_ROUTE_MS=60s. geojson sources read from disk (no self-HTTP); route sources fetched via internal base URL.
-- **LocalDataSourceDeclaration SDK export:** Added to wwv-plugin-sdk/src/index.ts re-exports (was absent from Plan 30-01 manifest.ts addition).
-
-## v1.3 Phase Map (archived reference)
-
-| Phase | Goal | Key requirements |
-|-------|------|-----------------|
-| 22 | Geocoding + Favorites | GEO-01..03, FAV-01..03, SAFE-01..02 |
-| 23 | Entity Filtering | FILT-01..04 |
-| 24 | Route Wiring + Version Bump | INTG-01, INTG-02 |
-| 25 | Documentation | DOC-01..04 |
+- **Generic API keys:** wwv_prefix.secret bearer tokens. authenticateApiKey() middleware reused for all MCP tools.
+- **LocalDataSource registry (Phase 30):** Manifest-declared registry making server-reachable static/client-side plugins MCP-queryable; per-source TTL cache (TTL_GEOJSON_MS=60min, TTL_ROUTE_MS=60s).
+- **emptyReason enum (evolving in v1.5):** v1.4 contract was "plugin_not_streaming" | "no_data_matches" | "no_session_active". v1.5 TOOL-01/TOOL-05 require session-independent tools to return no_data_matches | engine_unreachable | no_active_plugins instead of no_session_active. Lock the revised enum in Phase 33 before rewriting MCP_SERVER_INSTRUCTIONS.
+- **Nominatim rate limiting:** server-side Redis sliding window (1 req/sec) + 24h cache already live (v1.3 GEO-03). DEPLOY-03 elevates this to a single GLOBAL throttle (<=1 rps) protecting the shared geocoder -- do not re-implement per-request limiting.
 
 ## Blockers
 
@@ -69,15 +87,25 @@ None.
 
 ### Roadmap Evolution
 
-- Phase 30 added: Local Data-Source Bridge (Option A): generalized LocalDataSource registry to make server-reachable static/client-side plugins MCP-queryable; camera first consumer
-- v1.2 archived at .planning/milestones/v1.2-* and tagged v1.2 in git.
-- PR #215 (feat/mcp-support) open on GitHub, awaiting merge.
-- v1.3 complete 2026-05-31. All 4 phases shipped, tsc clean, 750 tests GREEN.
-- Phase numbering: v1.4 starts at Phase 26 (v1.3 ended at Phase 25).
-- Phase 26 is pure configuration/server-init work -- no new tool implementations. McpServer `instructions` string + two MCP Prompt registrations.
-- Phase 27 is pure description text rewriting across 15+ existing tools -- no schema changes, no new tools. Lowest risk phase.
-- Phase 28 requires code changes to query handler return shapes (emptyReason field) and one new Prisma mutation (update_favorite). Coordinate with prisma.favorite model in Phase 28 plan.
-- Phase 29 is the most complex: investigate_area is a compound tool that chains geocode -> plugin check -> region query -> SSE command -> prose generation internally. Design the internal chain carefully; it must not expose intermediate tool results to the caller.
-- Nominatim integration: server-side rate limiter (1 req/sec Redis sliding window) + 24h result cache are already live (GEO-03, Phase 22). investigate_area (TOOL-03) reuses this path -- do not re-implement.
-- Favorites use prisma.favorite directly -- never proxy through /api/user/favorites (cookie auth incompatible with API key sessions, SAFE-02). update_favorite (CRUD-01) must follow same pattern.
-- emptyReason values are an enum contract: "plugin_not_streaming" | "no_data_matches" | "no_session_active". Agree on this enum in Phase 28 and reference it in Phase 27 tool description rewrites -- do Phase 27 after Phase 26 but the enum must be locked before DESC-02 is written.
+- v1.5 derived from a public-launch premortem of the MCP server. One phase per REQUIREMENTS.md category, 1:1 mapping.
+- Phase numbering: v1.5 starts at Phase 31 (v1.4 ended at Phase 30). Do NOT renumber or reset.
+- Dependency note: Phase 31 (clean error contract) is foundational -- Phases 32/33/34 surface their rejections/limits/probe failures through it. Phase 35 depends on SEC-01 (HMAC secret) and OBS-01 (probes confirm wiring). Phase 36 depends on Phase 33 (final tool text) and Phase 35 (real deployment path).
+- Phase 36 is the only UI-touching phase (ConnectAgentHelper prerequisites + command-tool description framing) -- flagged UI hint: yes.
+- v1.4 (Phases 26-30) shipped 2026-06-02; archived reference retained above.
+
+## Deferred Items
+
+Items deferred at v1.5 milestone start (carried from v1.4 close on 2026-06-02):
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gap | Phase 29 v1.4-UAT.md — 25 pending scenarios | diagnosed (manual acceptance testing not completed; automated gate green) |
+| todo | 2026-05-30-system-default-common-plugin-tools.md [mcp] | pending (future idea — system-default common plugin tools) |
+| out_of_scope | Headless / render-on-demand globe | deferred (command tools keep live-session behavior; serverless globe is a large effort) |
+| out_of_scope | API key scopes / rotation flows | deferred (not a public-launch blocker) |
+| out_of_scope | Self-hosted geocoder | deferred (global throttle sufficient for launch) |
+
+## Operator Next Steps
+
+- Plan Phase 31 with /gsd:plan-phase 31 (Transport Resilience -- foundational error contract).
+- Phases execute in numeric order 31 → 32 → 33 → 34 → 35 → 36; dependencies allow some parallelism after Phase 31.

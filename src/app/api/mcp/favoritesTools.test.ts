@@ -53,6 +53,9 @@ describe("favoritesTools tool descriptions (DESC-03)", () => {
 
 describe("save_favorite tool handler", () => {
     it("calls prisma.favorite.upsert with userId from context, not from args", async () => {
+        // findUnique returns null -> new row, count returns 0 -> below cap
+        mockPrisma.favorite.findUnique.mockResolvedValue(null as never);
+        mockPrisma.favorite.count.mockResolvedValue(0 as never);
         mockPrisma.favorite.upsert.mockResolvedValue({} as never);
 
         await handlers["save_favorite"]({
@@ -73,6 +76,8 @@ describe("save_favorite tool handler", () => {
     });
 
     it("sets pluginName to pluginId as fallback when name is omitted", async () => {
+        mockPrisma.favorite.findUnique.mockResolvedValue(null as never);
+        mockPrisma.favorite.count.mockResolvedValue(0 as never);
         mockPrisma.favorite.upsert.mockResolvedValue({} as never);
 
         await handlers["save_favorite"]({ entityId: "ship:456", pluginId: "maritime" });
@@ -82,6 +87,34 @@ describe("save_favorite tool handler", () => {
                 create: expect.objectContaining({ pluginName: "maritime" }),
             }),
         );
+    });
+
+    it("rejects when user is at the 500-favorite cap and entity is new", async () => {
+        mockPrisma.favorite.findUnique.mockResolvedValue(null as never);
+        mockPrisma.favorite.count.mockResolvedValue(500 as never);
+
+        const result = await handlers["save_favorite"]({
+            entityId: "newship:999",
+            pluginId: "maritime",
+        });
+
+        expect(mockPrisma.favorite.upsert).not.toHaveBeenCalled();
+        const text = (result as { content: Array<{ text: string }> }).content[0].text;
+        expect(text).toContain("favorite limit of 500 reached");
+    });
+
+    it("allows upsert when entity already exists (no count check needed)", async () => {
+        // findUnique returns an existing row -> cap check is skipped
+        mockPrisma.favorite.findUnique.mockResolvedValue({ id: "existing" } as never);
+        mockPrisma.favorite.upsert.mockResolvedValue({} as never);
+
+        await handlers["save_favorite"]({
+            entityId: "ship:123",
+            pluginId: "maritime",
+        });
+
+        expect(mockPrisma.favorite.count).not.toHaveBeenCalled();
+        expect(mockPrisma.favorite.upsert).toHaveBeenCalled();
     });
 });
 

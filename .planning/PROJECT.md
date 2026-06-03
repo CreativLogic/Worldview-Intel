@@ -21,23 +21,19 @@ A single globe that shows everything happening in the world right now, extensibl
 
 **Tech stack additions:** ioredis singleton, @modelcontextprotocol/sdk, ReadableStream SSE, Redis ZSET/LIST/SET for state/commands/catalog
 
-## Current Milestone: v1.4 Agentic Intelligence
+## Current Milestone: v1.5 MCP Public-Launch Hardening
 
-**Goal:** Transform the WWV MCP server from a collection of atomic tools into a well-instructed, investigation-capable AI assistant -- one that knows what it has, reasons over the globe, and delivers both globe actions and prose reports.
+**Goal:** Close the premortem blockers so the MCP server is safe and honest to expose to the public -- a robust error contract, abuse-resistant auth, truthful tool responses, real health checks, production wiring, and clear onboarding.
 
-**Target features:**
-- Server `instructions` field + workflow sequences (agent oriented from first connection)
-- MCP Prompts for named workflows (`orient-globe`, `investigate`)
-- Full 6-component tool description rewrite across all 15+ existing tools
-- `emptyReason` field in all query responses (distinguishes "no data" from "plugin not loaded")
-- `list_available_plugins` tool (agent checks before querying)
-- `get_globe_context` tool (full orientation snapshot in one call)
-- `investigate_area` compound tool (geocode + check + query + act + report)
-- `update_favorite` tool (completes full CRUD lifecycle for favorites)
+**Target features (Phases 31-36):**
+- Transport resilience: well-formed JSON-RPC errors (no bare 500s), DB-outage-safe auth, explicit maxDuration, honest listChanged
+- Security and abuse-resistance: dedicated HMAC secret enforcement, Redis-backed per-key rate limiting, trusted-proxy client IP, input/length caps
+- Tool honesty: accurate emptyReason, validated ids (no success-on-no-op), honest region coverage, output caps, corrected server instructions
+- Observability: /api/health probes Redis + DB + data engine
+- Deployment wiring: prod compose Redis + WWV_DATA_ENGINE_URL + global geocoding throttle + infra checklist
+- Onboarding and framing: public quickstart, ConnectAgentHelper prerequisites, command tools documented as "requires an open globe session"
 
-**Backlog (deferred):**
-- PLG-01/PLG-02: list_plugins() + install_plugin() marketplace tools (backlog 999.1/999.2)
-- UX-01: ConnectAgentHelper upgrade CTA in demo edition (backlog 999.3)
+**Locked decisions:** command tools keep current behavior (they require a live signed-in browser session to control the globe); a headless/render-on-demand globe is out of scope (deferred).
 
 ## Requirements
 
@@ -63,17 +59,19 @@ A single globe that shows everything happening in the world right now, extensibl
 - Data query tools across all active plugins - v1.2
 - Plugin-contributed namespaced MCP tools via frontend relay - v1.2
 
-### Active (v1.4 Agentic Intelligence)
+**v1.4 Agentic Intelligence (Phases 26-30, shipped 2026-06-02)**
+- Server instructions + orientation prompts, 6-component tool description rewrite
+- emptyReason response contract, list_available_plugins / get_globe_context / investigate_area, update_favorite CRUD
+- Phase 30 LocalDataSource bridge (static/client-side plugins queryable server-side)
 
-- [ ] Server `instructions` field with role-framing and canonical workflow sequences
-- [ ] MCP Prompts: `orient-globe` and `investigate` named workflow templates
-- [ ] 6-component tool description rewrite for all command, query, and v1.3 tools
-- [ ] `emptyReason` field on all query tool responses
-- [ ] `get_plugin_filters` returns explicit `{available: false}` when plugin not active
-- [ ] `list_available_plugins` MCP tool (streaming plugins + entity counts)
-- [ ] `get_globe_context` MCP tool (full orientation snapshot)
-- [ ] `investigate_area` compound MCP tool (geocode + check + query + act + prose report)
-- [ ] `update_favorite` MCP tool (complete CRUD lifecycle for favorites)
+### Active (v1.5 MCP Public-Launch Hardening)
+
+- [ ] Transport: top-level JSON-RPC error contract, DB-outage-safe auth, explicit maxDuration, honest listChanged + re-poll docs
+- [ ] Security: dedicated API_KEY_HMAC_SECRET enforcement (cloud/demo), Redis-backed per-key rate limiting, trusted-proxy IP, favorites cap + identifier/string length+charset bounds
+- [ ] Tool honesty: session-independent emptyReason, validated layer/filter ids + focus_entity wiring, get_entities_in_region count/truncated + tighter bbox, investigate_area/get_plugin_data output caps, corrected MCP_SERVER_INSTRUCTIONS, engine_unreachable vs no_active_plugins
+- [ ] Observability: /api/health probes Redis + DB + data engine
+- [ ] Deployment: prod compose Redis + REDIS_URL, WWV_DATA_ENGINE_URL REST base, global Nominatim throttle, infra checklist
+- [ ] Onboarding: public quickstart doc, ConnectAgentHelper prerequisites, command-tool open-session requirement documented
 
 ### Out of Scope
 
@@ -84,6 +82,7 @@ A single globe that shows everything happening in the world right now, extensibl
 - CLI tool -- API + MCP cover v1.2; CLI is additive and non-blocking
 - API key scopes/permissions and rotation/grace-period flows -- revisit later
 - OAuth 2.1 for MCP auth -- personal API keys sufficient for v1.2
+- Headless / render-on-demand globe (v1.5) -- command tools require a live signed-in browser session; building a serverless globe is deferred
 
 ## Context
 
@@ -112,4 +111,4 @@ A single globe that shows everything happening in the world right now, extensibl
 This document evolves at phase transitions and milestone boundaries.
 
 ---
-*Last updated: 2026-05-31 after v1.4 milestone start*
+*Last updated: 2026-06-03 after v1.5 milestone start*

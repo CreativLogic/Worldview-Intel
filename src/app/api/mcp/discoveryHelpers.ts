@@ -41,7 +41,9 @@ export function radiusKmToBbox(lat: number, lon: number, radiusKm: number): Regi
     const latDelta = radiusKm / 111;
     const cosLat = Math.cos((lat * Math.PI) / 180);
     const clampedCos = Math.max(cosLat, 0.01);
-    const lonDelta = radiusKm / (111 * clampedCos);
+    // Cap lonDelta at 180 so a globe-spanning radius yields the full longitude
+    // range [-180, 180] rather than wrapping to a thin antimeridian strip.
+    const lonDelta = Math.min(radiusKm / (111 * clampedCos), 180);
     const wrapLon = (v: number): number => ((((v + 180) % 360) + 360) % 360) - 180;
     return {
         north: Math.min(lat + latDelta, 90),
@@ -103,16 +105,47 @@ export interface ListStreamingPluginsResult {
 }
 
 /**
+ * Probes whether the data engine manifest endpoint is reachable.
+ * Returns true when the engine responds with 2xx, false on network error or non-2xx.
+ *
+ * Timeout is intentionally short (2000ms) so callers on the empty-snapshot path
+ * are not blocked waiting for a slow engine.
+ */
+async function probeEngineReachable(): Promise<boolean> {
+    const engineUrl = (process.env.WWV_DATA_ENGINE_URL ?? "http://localhost:5001") + "/manifest";
+    try {
+        const res = await fetch(engineUrl, { signal: AbortSignal.timeout(2000) });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Fetches the engine manifest and per-plugin snapshots to build a summary list.
- * Returns `{ plugins: [], reason: "engine unreachable" }` when no snapshots are
- * available (engine down or no active plugins).
+ *
+ * Reasons when plugins array is empty:
+ *   engine_unreachable  -- manifest fetch failed or engine returned non-2xx.
+ *   no_active_plugins   -- engine reachable but zero plugins active right now.
+ *
+ * Local sources (e.g. camera) are tagged source:'local' and are surfaced
+ * even when the engine is down (getAllPluginSnapshots includes local sources).
+ *
+ * The probe runs only on the empty-snapshot path to avoid the double-manifest
+ * hit on every happy-path call.
  */
 export async function listStreamingPlugins(): Promise<ListStreamingPluginsResult> {
-    const snapshots = await getAllPluginSnapshots();
+    const [snapshots, localIds] = await Promise.all([
+        getAllPluginSnapshots(),
+        getLocalSourceIds(),
+    ]);
+
     if (snapshots.length === 0) {
-        return { plugins: [], reason: "engine unreachable" };
+        const engineReachable = await probeEngineReachable();
+        const reason = engineReachable ? "no_active_plugins" : "engine_unreachable";
+        return { plugins: [], reason };
     }
-    const localIds = await getLocalSourceIds();
+
     const plugins: StreamingPlugin[] = snapshots.map((snap) => ({
         pluginId: snap.pluginId,
         pluginName: snap.pluginId, // manifest exposes ids only

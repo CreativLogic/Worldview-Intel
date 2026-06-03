@@ -84,9 +84,17 @@ describe("RateLimiter", () => {
 });
 
 describe("getClientIp", () => {
-    it("extracts IP from x-forwarded-for (first entry)", () => {
+    it("extracts the rightmost IP from x-forwarded-for (proxy-appended real IP)", () => {
         const req = new Request("http://localhost", {
             headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" },
+        });
+        // 5.6.7.8 is the rightmost — appended by the trusted reverse proxy
+        expect(getClientIp(req)).toBe("5.6.7.8");
+    });
+
+    it("handles a single-entry x-forwarded-for", () => {
+        const req = new Request("http://localhost", {
+            headers: { "x-forwarded-for": "1.2.3.4" },
         });
         expect(getClientIp(req)).toBe("1.2.3.4");
     });
@@ -103,7 +111,7 @@ describe("getClientIp", () => {
         expect(getClientIp(req)).toBe("unknown");
     });
 
-    it("property test: x-forwarded-for always returns the first IP in a list", () => {
+    it("property test: x-forwarded-for always returns the LAST IP in a list", () => {
         fc.assert(
             fc.property(
                 fc.array(fc.ipV4(), { minLength: 1, maxLength: 10 }),
@@ -112,7 +120,7 @@ describe("getClientIp", () => {
                     const req = new Request("http://localhost", {
                         headers: { "x-forwarded-for": headerValue },
                     });
-                    expect(getClientIp(req)).toBe(ips[0]);
+                    expect(getClientIp(req)).toBe(ips[ips.length - 1]);
                 }
             )
         );

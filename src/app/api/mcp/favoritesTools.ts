@@ -25,6 +25,9 @@ import { prisma } from "@/lib/prisma";
 import { readActiveSessions } from "@/lib/globeStateStore";
 import { getEntityDetails } from "@/lib/data-query/service";
 import type { Prisma } from "@/generated/prisma";
+import { pluginIdSchema, entityIdSchema } from "@/lib/mcp/identifierSchemas";
+
+const FAVORITES_CAP = 500;
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -74,16 +77,31 @@ export function registerFavoritesTools(
                 "Output: 'Saved favorite: <label>'. " +
                 "Example: save_favorite({ entityId: 'AFR123', pluginId: 'flights', name: 'Air France 123' }).",
             inputSchema: {
-                entityId: z.string().min(1).describe("Unique entity identifier"),
-                pluginId: z.string().min(1).describe("Plugin that owns this entity"),
+                entityId: entityIdSchema.describe("Unique entity identifier"),
+                pluginId: pluginIdSchema.describe("Plugin that owns this entity"),
                 name: z
                     .string()
+                    .min(1)
+                    .max(120)
                     .optional()
                     .describe("Human-readable label for the bookmark (defaults to entityId)"),
             },
         },
         async (args) => {
             try {
+                // Cap: reject new rows when the user already has FAVORITES_CAP favorites.
+                // Upserts that update an existing row are always allowed.
+                const existing = await prisma.favorite.findUnique({
+                    where: favoriteWhere(userId, args.entityId),
+                    select: { id: true },
+                });
+                if (!existing) {
+                    const count = await prisma.favorite.count({ where: { userId } });
+                    if (count >= FAVORITES_CAP) {
+                        return textResult(`favorite limit of ${FAVORITES_CAP} reached`);
+                    }
+                }
+
                 const label = args.name ?? args.entityId;
                 await prisma.favorite.upsert({
                     where: favoriteWhere(userId, args.entityId),
@@ -162,9 +180,9 @@ export function registerFavoritesTools(
                 "Output: 'Updated favorite: <label>' on success, or an error string. " +
                 "Example: update_favorite({ favoriteId: 'AFR123', name: 'Air France 123', notes: 'Check weekly' }).",
             inputSchema: {
-                favoriteId: z.string().min(1).describe("The entityId of the favorite to update"),
-                name: z.string().optional().describe("New display label for the bookmark"),
-                notes: z.string().optional().describe("Free-text annotation to store with the bookmark"),
+                favoriteId: entityIdSchema.describe("The entityId of the favorite to update"),
+                name: z.string().min(1).max(120).optional().describe("New display label for the bookmark"),
+                notes: z.string().max(2000).optional().describe("Free-text annotation to store with the bookmark"),
             },
         },
         async (args) => {
@@ -203,7 +221,7 @@ export function registerFavoritesTools(
                 "Output: 'Removed favorite: <entityId>'. " +
                 "Example: remove_favorite({ entityId: 'AFR123' }).",
             inputSchema: {
-                entityId: z.string().min(1).describe("Entity identifier to remove from favorites"),
+                entityId: entityIdSchema.describe("Entity identifier to remove from favorites"),
             },
         },
         async (args) => {

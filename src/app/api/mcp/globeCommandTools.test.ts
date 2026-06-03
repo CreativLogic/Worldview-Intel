@@ -22,14 +22,24 @@ import { latSchema as sharedLatSchema, lonSchema as sharedLonSchema } from "@/li
 // declared with vi.hoisted() to be accessible inside the factory function.
 // ---------------------------------------------------------------------------
 
-const { mockEnqueue, mockResolveSessionId } = vi.hoisted(() => ({
+const { mockEnqueue, mockResolveSessionId, mockListStreamingPlugins, mockGetEntityDetails } = vi.hoisted(() => ({
     mockEnqueue: vi.fn().mockResolvedValue(undefined),
     mockResolveSessionId: vi.fn().mockResolvedValue("resolved-session"),
+    mockListStreamingPlugins: vi.fn().mockResolvedValue({ plugins: [] }),
+    mockGetEntityDetails: vi.fn().mockResolvedValue({ data: null, emptyReason: "no_data_matches" }),
 }));
 
 vi.mock("@/lib/globeCommandQueue", () => ({
     enqueueGlobeCommand: mockEnqueue,
     resolveActiveSessionId: mockResolveSessionId,
+}));
+
+vi.mock("./discoveryHelpers", () => ({
+    listStreamingPlugins: mockListStreamingPlugins,
+}));
+
+vi.mock("@/lib/data-query/service", () => ({
+    getEntityDetails: mockGetEntityDetails,
 }));
 
 // ---------------------------------------------------------------------------
@@ -56,6 +66,8 @@ beforeEach(() => {
     vi.resetAllMocks();
     mockEnqueue.mockResolvedValue(undefined);
     mockResolveSessionId.mockResolvedValue("resolved-session");
+    mockListStreamingPlugins.mockResolvedValue({ plugins: [] });
+    mockGetEntityDetails.mockResolvedValue({ data: null, emptyReason: "no_data_matches" });
 });
 
 // ---------------------------------------------------------------------------
@@ -433,5 +445,135 @@ describe("get_entities_in_region coordinate schema bounds (TOOL-09)", () => {
 
     it("rejects Infinity for a longitude bound", () => {
         expect(sharedLonSchema.safeParse(Infinity).success).toBe(false);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// TOOL-02 (Phase 33): toggle_layer unrecognized id warning
+// ---------------------------------------------------------------------------
+
+describe("toggle_layer -- unrecognized layerId warning (TOOL-02/P33)", () => {
+    it("enqueues command and returns warning when layerId is not a known plugin", async () => {
+        mockListStreamingPlugins.mockResolvedValue({ plugins: [{ pluginId: "flights" }] });
+
+        const { server, tools } = makeFakeServer();
+        registerGlobeCommandTools(
+            server as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+            { userId: "u1" },
+        );
+
+        const result = await tools.get("toggle_layer")!({ layerId: "unknown-layer-xyz" });
+
+        expect(mockEnqueue).toHaveBeenCalledOnce();
+        expect(result.content[0].text).toContain("not a recognized plugin");
+        expect(result.content[0].text).toContain("unknown-layer-xyz");
+    });
+
+    it("enqueues command and returns plain success when layerId is recognized", async () => {
+        mockListStreamingPlugins.mockResolvedValue({ plugins: [{ pluginId: "flights" }] });
+
+        const { server, tools } = makeFakeServer();
+        registerGlobeCommandTools(
+            server as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+            { userId: "u1" },
+        );
+
+        const result = await tools.get("toggle_layer")!({ layerId: "flights" });
+
+        expect(mockEnqueue).toHaveBeenCalledOnce();
+        expect(result.content[0].text).not.toContain("not a recognized plugin");
+        expect(result.content[0].text).toContain("flights");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// TOOL-02 (Phase 33): focus_entity server-side entity-id resolution
+// ---------------------------------------------------------------------------
+
+describe("focus_entity -- server-side entity resolution (TOOL-02/P33)", () => {
+    it("resolves lat/lon from entityId+pluginId when coordinates are absent", async () => {
+        mockGetEntityDetails.mockResolvedValue({
+            data: {
+                id: "ship-1",
+                pluginId: "ais",
+                latitude: 35.68,
+                longitude: 139.69,
+                timestamp: new Date(),
+                properties: {},
+            },
+        });
+
+        const { server, tools } = makeFakeServer();
+        registerGlobeCommandTools(
+            server as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+            { userId: "u1" },
+        );
+
+        const result = await tools.get("focus_entity")!({
+            entityId: "ship-1",
+            pluginId: "ais",
+        });
+
+        expect(mockEnqueue).toHaveBeenCalledWith(
+            "u1",
+            "resolved-session",
+            expect.objectContaining({ type: "focusEntity", lat: 35.68, lon: 139.69 }),
+        );
+        expect(result.content[0].text).toContain("35.68");
+    });
+
+    it("returns honest failure when entityId cannot be resolved (no pluginId provided)", async () => {
+        // Without pluginId the resolver path is skipped and resolution fails.
+        const { server, tools } = makeFakeServer();
+        registerGlobeCommandTools(
+            server as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+            { userId: "u1" },
+        );
+
+        const result = await tools.get("focus_entity")!({ entityId: "unknown-entity" });
+
+        expect(mockEnqueue).not.toHaveBeenCalled();
+        expect(result.content[0].text).toContain("Could not resolve entityId");
+        expect(result.content[0].text).toContain("unknown-entity");
+    });
+
+    it("returns honest failure when entity not found in plugin snapshot", async () => {
+        mockGetEntityDetails.mockResolvedValue({ data: null, emptyReason: "no_data_matches" });
+
+        const { server, tools } = makeFakeServer();
+        registerGlobeCommandTools(
+            server as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+            { userId: "u1" },
+        );
+
+        const result = await tools.get("focus_entity")!({
+            entityId: "missing-entity",
+            pluginId: "ais",
+        });
+
+        expect(mockEnqueue).not.toHaveBeenCalled();
+        expect(result.content[0].text).toContain("Could not resolve entityId");
+    });
+
+    it("uses provided lat/lon directly without calling getEntityDetails", async () => {
+        const { server, tools } = makeFakeServer();
+        registerGlobeCommandTools(
+            server as unknown as import("@modelcontextprotocol/sdk/server/mcp.js").McpServer,
+            { userId: "u1" },
+        );
+
+        const result = await tools.get("focus_entity")!({
+            entityId: "e1",
+            lat: 10,
+            lon: 20,
+        });
+
+        expect(mockGetEntityDetails).not.toHaveBeenCalled();
+        expect(mockEnqueue).toHaveBeenCalledWith(
+            "u1",
+            "resolved-session",
+            expect.objectContaining({ lat: 10, lon: 20 }),
+        );
+        expect(result.content[0].text).toContain("10");
     });
 });

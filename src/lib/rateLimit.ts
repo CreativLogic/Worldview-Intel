@@ -61,17 +61,35 @@ export class RateLimiter {
 }
 
 /**
- * Extract client IP from request headers.
- * WARNING: When deploying directly without a reverse proxy, 'x-forwarded-for'
- * and 'x-real-ip' can be spoofed by the client, bypassing rate limits.
- * In a production architecture with a load balancer (Cloudflare, AWS ALB),
- * this is safe as the LB overwrites the header. Consider verifying against
- * trusted proxy subnets if direct access is possible.
+ * Extract the real client IP from request headers.
+ *
+ * Reverse-proxy assumption: this app is always behind a trusted reverse proxy
+ * (Traefik on Coolify, or Cloudflare). The proxy appends the real client IP as
+ * the RIGHTMOST entry in x-forwarded-for. Using the leftmost entry is unsafe
+ * because an attacker can inject arbitrary IPs at the front of that header
+ * before the request reaches the proxy.
+ *
+ * Override: set WWV_TRUSTED_IP_HEADER to a platform-specific header that
+ * carries the guaranteed client IP (e.g. "cf-connecting-ip" for Cloudflare,
+ * "x-real-ip" for Nginx). When set, that header is used directly.
+ *
+ * Falls back to "unknown" when no header is present (e.g. in unit tests).
  */
 export function getClientIp(request: Request): string {
-    return (
-        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-        || request.headers.get("x-real-ip")
-        || "unknown"
-    );
+    const override = process.env.WWV_TRUSTED_IP_HEADER?.trim().toLowerCase();
+    if (override) {
+        const val = request.headers.get(override)?.trim();
+        if (val) return val;
+    }
+
+    // Use the rightmost (proxy-appended) entry from x-forwarded-for, not the
+    // leftmost (client-controlled) entry.
+    const xff = request.headers.get("x-forwarded-for");
+    if (xff) {
+        const entries = xff.split(",");
+        const rightmost = entries[entries.length - 1]?.trim();
+        if (rightmost) return rightmost;
+    }
+
+    return request.headers.get("x-real-ip")?.trim() || "unknown";
 }

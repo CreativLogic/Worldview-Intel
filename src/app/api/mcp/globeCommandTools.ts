@@ -21,9 +21,13 @@ import { enqueueGlobeCommand, resolveActiveSessionId } from "@/lib/globeCommandQ
 import { TIME_WINDOW_VALUES } from "@/core/globe/types/GlobeCommand";
 import type { GlobeCommand } from "@/core/globe/types/GlobeCommand";
 import { latSchema, lonSchema, altSchema } from "@/lib/mcp/coordinateSchemas";
+import { layerIdSchema, entityIdSchema } from "@/lib/mcp/identifierSchemas";
+import { SESSION_REQUIRED_PREAMBLE } from "@/lib/mcp/toolDescriptionFragments";
+import { listStreamingPlugins } from "./discoveryHelpers";
+import { getEntityDetails } from "@/lib/data-query/service";
 
 // Re-export so existing tests that import from this module continue to work.
-export { latSchema, lonSchema, altSchema };
+export { latSchema, lonSchema, altSchema, layerIdSchema };
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -66,6 +70,7 @@ export function registerGlobeCommandTools(
         "pan_globe",
         {
             description:
+                SESSION_REQUIRED_PREAMBLE +
                 "Fly the globe camera to an explicit coordinate. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
                 "Prefer pan_globe over focus_entity when you have a lat/lon and no entity id, or when focus_entity entity-id resolution is not needed. " +
                 "Limitations: latitude [-90, 90], longitude [-180, 180], altitude > 0 metres; out-of-range values are rejected. " +
@@ -109,13 +114,18 @@ export function registerGlobeCommandTools(
         "focus_entity",
         {
             description:
+                SESSION_REQUIRED_PREAMBLE +
                 "Point the globe camera at a known entity or coordinate. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
-                "Prefer focus_entity over pan_globe when you have an entity id and want to centre on it; note entity-id-to-coordinate resolution is not yet wired, so always include lat/lon for a reliable camera move. " +
-                "Limitations: latitude [-90, 90], longitude [-180, 180]; entityId alone will not move the camera until resolution is wired. " +
-                "Parameters: entityId (optional, informational), lat (recommended), lon (recommended), sessionId (optional). " +
-                "Example: focus_entity({entityId:\"ship-123\",lat:35.68,lon:139.69})",
+                "Prefer focus_entity over pan_globe when you have an entity id and want to centre on it. " +
+                "When lat/lon are provided they are used directly. " +
+                "When only entityId is provided (no lat/lon), the server resolves coordinates via pluginId + entityId lookup -- include pluginId for a faster, scoped lookup. " +
+                "Returns an error string when entityId cannot be resolved to coordinates. " +
+                "Limitations: latitude [-90, 90], longitude [-180, 180]. " +
+                "Parameters: entityId (optional), pluginId (optional, scopes entity lookup), lat (optional), lon (optional), sessionId (optional). " +
+                "Example: focus_entity({entityId:\"ship-123\",pluginId:\"ais\",lat:35.68,lon:139.69})",
             inputSchema: {
-                entityId: z.string().optional().describe("Entity id (informational; coordinate resolution not yet supported -- also provide lat/lon)"),
+                entityId: entityIdSchema.optional().describe("Entity id to focus on"),
+                pluginId: z.string().optional().describe("Plugin that owns this entity -- narrows the id lookup when lat/lon are not provided"),
                 lat: latSchema.optional().describe("Latitude to focus on [-90, 90]"),
                 lon: lonSchema.optional().describe("Longitude to focus on [-180, 180]"),
                 sessionId: z.string().optional().describe("Target globe session id. Obtain valid ids by reading the globe://sessions resource. Omit to target your most-recently-active browser tab."),
@@ -126,14 +136,39 @@ export function registerGlobeCommandTools(
                 const sessionId = await resolveSession(userId, args.sessionId);
                 if (sessionId === null) return NO_SESSION_RESULT;
 
+                let resolvedLat = args.lat;
+                let resolvedLon = args.lon;
+
+                // When coordinates are absent but entityId is present, resolve server-side.
+                if (resolvedLat === undefined && resolvedLon === undefined && args.entityId !== undefined) {
+                    if (args.pluginId !== undefined) {
+                        const detail = await getEntityDetails(args.pluginId, args.entityId);
+                        if (detail.data !== null) {
+                            resolvedLat = detail.data.latitude;
+                            resolvedLon = detail.data.longitude;
+                        }
+                    }
+
+                    if (resolvedLat === undefined) {
+                        // entityId could not be resolved -- return an honest failure instead of
+                        // enqueuing a command the browser cannot execute.
+                        return textResult(
+                            `Could not resolve entityId '${args.entityId}' to coordinates. ` +
+                            `Provide pluginId to scope the lookup, or include lat/lon directly.`,
+                        );
+                    }
+                }
+
                 const cmd: GlobeCommand = {
                     type: "focusEntity",
                     ...(args.entityId !== undefined && { entityId: args.entityId }),
-                    ...(args.lat !== undefined && { lat: args.lat }),
-                    ...(args.lon !== undefined && { lon: args.lon }),
+                    ...(resolvedLat !== undefined && { lat: resolvedLat }),
+                    ...(resolvedLon !== undefined && { lon: resolvedLon }),
                 };
                 await enqueueGlobeCommand(userId, sessionId, cmd);
-                return textResult(`Focus entity command enqueued (entityId=${args.entityId ?? "none"}, lat=${args.lat ?? "none"}, lon=${args.lon ?? "none"})`);
+                return textResult(
+                    `Focus entity command enqueued (entityId=${args.entityId ?? "none"}, lat=${resolvedLat ?? "none"}, lon=${resolvedLon ?? "none"})`,
+                );
             } catch (err) {
                 console.error("[globeCommandTools] focus_entity failed:", err);
                 return textResult("focus_entity command failed");
@@ -146,13 +181,15 @@ export function registerGlobeCommandTools(
         "toggle_layer",
         {
             description:
+                SESSION_REQUIRED_PREAMBLE +
                 "Enable or disable a plugin data layer on the globe. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
                 "Prefer toggle_layer over pan_globe or set_timeline when changing layer visibility, not camera position or playback time. " +
-                "Limitations: layerId must match an installed plugin id; unknown ids are silently ignored by the browser. " +
-                "Parameters: layerId (required), enabled (true/false, optional — omit to toggle current state), sessionId (optional). " +
+                "Use list_available_plugins to confirm valid layerIds before calling. " +
+                "Limitations: layerId must match an installed plugin id. When the id is not recognized a warning is included in the response. " +
+                "Parameters: layerId (required), enabled (true/false, optional -- omit to toggle current state), sessionId (optional). " +
                 "Example: toggle_layer({layerId:\"ais\",enabled:true})",
             inputSchema: {
-                layerId: z.string().describe("The plugin/layer identifier to toggle"),
+                layerId: layerIdSchema.describe("The plugin/layer identifier to toggle"),
                 enabled: z.boolean().optional().describe("True to enable, false to disable, omit to toggle"),
                 sessionId: z.string().optional().describe("Target globe session id. Obtain valid ids by reading the globe://sessions resource. Omit to target your most-recently-active browser tab."),
             },
@@ -162,12 +199,23 @@ export function registerGlobeCommandTools(
                 const sessionId = await resolveSession(userId, args.sessionId);
                 if (sessionId === null) return NO_SESSION_RESULT;
 
+                // Check whether the layerId matches a known streaming plugin.
+                const { plugins } = await listStreamingPlugins();
+                const knownIds = new Set(plugins.map((p) => p.pluginId));
+                const isKnown = knownIds.has(args.layerId);
+
                 const cmd: GlobeCommand = {
                     type: "toggleLayer",
                     layerId: args.layerId,
                     ...(args.enabled !== undefined && { enabled: args.enabled }),
                 };
                 await enqueueGlobeCommand(userId, sessionId, cmd);
+
+                if (!isKnown) {
+                    return textResult(
+                        `Command enqueued, but layerId '${args.layerId}' is not a recognized plugin. It may be ignored.`,
+                    );
+                }
                 return textResult(`Layer '${args.layerId}' toggle command enqueued`);
             } catch (err) {
                 console.error("[globeCommandTools] toggle_layer failed:", err);
@@ -181,6 +229,7 @@ export function registerGlobeCommandTools(
         "set_timeline",
         {
             description:
+                SESSION_REQUIRED_PREAMBLE +
                 "Set the globe timeline position, time window, or playback mode. Requires an active globe session: READ globe://sessions first. If no tab is open, returns \"no active globe session to control\". " +
                 "Prefer set_timeline over toggle_layer or pan_globe when adjusting time or playback, not layer visibility or camera position. " +
                 "Limitations: currentTime must be ISO 8601; timeWindow must be one of '1h','6h','24h','48h','7d'. " +

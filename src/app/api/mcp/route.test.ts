@@ -247,6 +247,31 @@ describe("MCP-01/MCP-02: Valid auth + non-demo -> request passes both gates", ()
 });
 
 // ---------------------------------------------------------------------------
+// TRANS-04: tools.listChanged must NOT be advertised as true
+// ---------------------------------------------------------------------------
+
+describe("TRANS-04: McpServer is not created with tools.listChanged: true", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+        vi.mocked(authenticateApiKey).mockResolvedValue({ userId: "user-123", keyId: "key-1" });
+    });
+
+    it("capabilities passed to McpServer constructor have listChanged false or absent (never true)", async () => {
+        const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
+        const mcpCtor = vi.mocked(McpServer);
+
+        const req = makeRequest("POST", { authorization: "Bearer wwv_valid.token" });
+        await POST(req);
+
+        expect(mcpCtor).toHaveBeenCalledTimes(1);
+        // second arg is the options object: { instructions, capabilities }
+        const options = mcpCtor.mock.calls[0][1] as { capabilities?: { tools?: { listChanged?: boolean } } } | undefined;
+        const listChanged = options?.capabilities?.tools?.listChanged;
+        expect(listChanged).not.toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // MCP-06: Streaming headers — X-Accel-Buffering: no must be present (Pitfall 1)
 // ---------------------------------------------------------------------------
 //
@@ -268,6 +293,93 @@ describe("MCP-06: Streaming response headers", () => {
 
         // Primary streaming guard — must be present on every streamed response
         expect(res.headers.get("X-Accel-Buffering")).toBe("no");
+    });
+});
+
+// ---------------------------------------------------------------------------
+// TRANS-01: Top-level error boundary — unexpected throws -> JSON-RPC -32603
+// ---------------------------------------------------------------------------
+
+describe("TRANS-01: unhandled error during request handling yields JSON-RPC -32603", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+    });
+
+    it("POST returns HTTP 500 with JSON-RPC -32603 body when a registrar throws", async () => {
+        // Simulate an unexpected failure after auth succeeds (e.g. Redis down).
+        // We make authenticateApiKey succeed but then make registerOrientationPrompts
+        // throw by having McpServer.registerPrompt throw.
+        vi.mocked(authenticateApiKey).mockResolvedValue({ userId: "user-123", keyId: "key-1" });
+
+        const { McpServer } = await import("@modelcontextprotocol/sdk/server/mcp.js");
+        vi.mocked(McpServer).mockImplementationOnce(function (this: unknown) {
+            return {
+                connect: vi.fn().mockResolvedValue(undefined),
+                registerResource: vi.fn(),
+                registerTool: vi.fn(),
+                registerPrompt: vi.fn().mockImplementation(() => {
+                    throw new Error("Redis connection refused");
+                }),
+            };
+        });
+
+        const req = makeRequest("POST", { authorization: "Bearer wwv_valid.token" });
+        const res = await POST(req);
+        const body = await res.json();
+
+        expect(res.status).toBe(500);
+        expect(body).toEqual({
+            jsonrpc: "2.0",
+            id: null,
+            error: { code: -32603, message: "Internal error" },
+        });
+    });
+
+    it("GET returns HTTP 500 with JSON-RPC -32603 body when transport.handleRequest throws", async () => {
+        vi.mocked(authenticateApiKey).mockResolvedValue({ userId: "user-123", keyId: "key-1" });
+
+        const { WebStandardStreamableHTTPServerTransport } = await import(
+            "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js"
+        );
+        vi.mocked(WebStandardStreamableHTTPServerTransport).mockImplementationOnce(() => ({
+            handleRequest: vi.fn().mockRejectedValue(new Error("stream error")),
+        }));
+
+        const req = makeRequest("GET", { authorization: "Bearer wwv_valid.token" });
+        const res = await GET(req);
+        const body = await res.json();
+
+        expect(res.status).toBe(500);
+        expect(body).toEqual({
+            jsonrpc: "2.0",
+            id: null,
+            error: { code: -32603, message: "Internal error" },
+        });
+    });
+
+    // Defense-in-depth: if authenticateApiKey ever regresses and throws instead
+    // of returning null, the boundary must still catch it and return -32603.
+    // In practice TRANS-02 makes authenticateApiKey return null on DB outage,
+    // so this path is hypothetical, not a real DB-outage scenario.
+    it("-32603 response carries streaming headers (X-Accel-Buffering: no) [defense-in-depth: hypothetical auth throw]", async () => {
+        vi.mocked(authenticateApiKey).mockRejectedValue(new Error("DB down"));
+
+        const req = makeRequest("POST", { authorization: "Bearer wwv_valid.token" });
+        const res = await POST(req);
+
+        expect(res.status).toBe(500);
+        expect(res.headers.get("X-Accel-Buffering")).toBe("no");
+    });
+
+    it("existing 401 path is NOT affected by the error boundary", async () => {
+        vi.mocked(authenticateApiKey).mockResolvedValue(null);
+
+        const req = makeRequest("POST");
+        const res = await POST(req);
+
+        expect(res.status).toBe(401);
+        const body = await res.json();
+        expect(body.error.code).toBe(-32600);
     });
 });
 

@@ -46,6 +46,9 @@ const DEFAULT_RADIUS_KM = 50;
 /** Altitude (metres) used for camera pan commands from investigate_area. */
 const INVESTIGATE_PAN_ALT = 300_000;
 
+/** Maximum total entities returned across all plugins by investigate_area (TOOL-04). */
+const INVESTIGATE_AREA_CAP = 200;
+
 // ---------------------------------------------------------------------------
 // Public registrar
 // ---------------------------------------------------------------------------
@@ -125,6 +128,7 @@ export function registerDiscoveryTools(
                 "Use this tool when an agent asks 'what is near X?' or 'show me Y around Z'. Prefer this over manual geocode + search_entities sequences. " +
                 "When no matching plugin streams the given entity_type, the summary explains this and suggests list_available_plugins. " +
                 "When no active session is found, entities are still returned but the summary notes the camera pan was skipped. " +
+                "Response is capped at 200 entities total across all matched plugins. When 'truncated' is true, 'cappedTotal' holds the sum of per-plugin results before the global cap (not the true global count, because each plugin is itself queried with its own 100-entity limit). " +
                 "Parameters: place_name (required), entity_type (required, case-insensitive substring match against plugin ids/names), radius_km (optional, default 50). " +
                 "Example: investigate_area({place_name:\"Auckland\",entity_type:\"flights\",radius_km:100})",
             inputSchema: {
@@ -195,18 +199,31 @@ export function registerDiscoveryTools(
                     await enqueueGlobeCommand(userId, sessionId, cmd);
                 }
 
-                // Step 5: Build prose summary using first matched plugin as representative.
+                // Step 5: Apply overall cap and record truncation metadata.
+                // cappedTotal is the sum of per-plugin results before the global cap.
+                // It is NOT the true global count because each plugin is queried with
+                // its own 100-entity limit before reaching here.
+                const cappedTotal = allEntities.length;
+                const truncated = cappedTotal > INVESTIGATE_AREA_CAP;
+                const entities = truncated ? allEntities.slice(0, INVESTIGATE_AREA_CAP) : allEntities;
+
+                // Step 6: Build prose summary using first matched plugin as representative.
                 const representativePlugin = matched[0].pluginId;
                 const summary = buildInvestigateProse({
                     displayName: geo.display_name,
                     entityType: entity_type,
                     matchedPlugin: representativePlugin,
-                    entityCount: allEntities.length,
+                    entityCount: entities.length,
                     sessionPresent,
                     emptyReason: lastEmptyReason,
                 });
 
-                return textResult({ entities: allEntities, summary });
+                return textResult({
+                    entities,
+                    count: entities.length,
+                    ...(truncated && { truncated: true, cappedTotal }),
+                    summary,
+                });
             } catch (err) {
                 console.error("[discoveryTools] investigate_area failed:", err);
                 return textResult({

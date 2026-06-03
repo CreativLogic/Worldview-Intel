@@ -13,6 +13,8 @@ export const prisma = {
     favorite: {
         upsert: vi.fn(),
         findMany: vi.fn(),
+        findUnique: vi.fn(),
+        count: vi.fn(),
         delete: vi.fn(),
         deleteMany: vi.fn(),
         update: vi.fn(),

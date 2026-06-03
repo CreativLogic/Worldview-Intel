@@ -22,6 +22,9 @@ import { enqueueGlobeCommand, resolveActiveSessionId } from "@/lib/globeCommandQ
 import { readSessionCatalog } from "@/lib/mcpSessionCatalog";
 import { filterValueSchema } from "@/lib/mcp/filterSchemas";
 import type { GlobeCommand } from "@/core/globe/types/GlobeCommand";
+import { pluginIdSchema } from "@/lib/mcp/identifierSchemas";
+import { listStreamingPlugins } from "@/app/api/mcp/discoveryHelpers";
+import { SESSION_REQUIRED_PREAMBLE } from "@/lib/mcp/toolDescriptionFragments";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -64,14 +67,16 @@ export function registerFilterTools(
         "set_filter",
         {
             description:
+                SESSION_REQUIRED_PREAMBLE +
                 "Apply one or more filters to a plugin's live globe layer (no page reload). " +
                 "Use after get_plugin_filters to discover valid filter ids; affects the live globe layer, not data query tools. " +
-                "Limitations: filter ids are plugin-specific; invalid ids are silently ignored by the browser. " +
+                "Use list_available_plugins to confirm valid pluginIds before calling. " +
+                "Limitations: filter ids are plugin-specific; unknown pluginIds produce a warning in the response. " +
                 "Parameters: pluginId (string, required); filters (object, required) -- filterId -> { type: 'text', value } | { type: 'select', values } | { type: 'range', min, max } | { type: 'boolean', value }; sessionId (optional). " +
-                "Output: 'set_filter command enqueued for <pluginId> (N filter(s))' or 'no active globe session to control'. " +
+                "Output: 'set_filter command enqueued for <pluginId> (N filter(s))' or a warning when the pluginId is unrecognized. " +
                 "Example: set_filter({ pluginId: 'flights', filters: { status: { type: 'select', values: ['airborne'] } } }).",
             inputSchema: {
-                pluginId: z.string().min(1).describe("Plugin whose layer to filter, e.g. 'flights'"),
+                pluginId: pluginIdSchema.describe("Plugin whose layer to filter, e.g. 'flights'"),
                 filters: z
                     .record(z.string(), filterValueSchema)
                     .describe("Map of filterId -> filter value. Discover valid filter ids via get_plugin_filters."),
@@ -83,12 +88,23 @@ export function registerFilterTools(
                 const sessionId = await resolveSession(userId, args.sessionId);
                 if (sessionId === null) return NO_SESSION_RESULT;
 
+                // Validate the pluginId against the live streaming plugin set.
+                const { plugins } = await listStreamingPlugins();
+                const knownIds = new Set(plugins.map((p) => p.pluginId));
+                const isKnown = knownIds.has(args.pluginId);
+
                 const cmd: GlobeCommand = {
                     type: "setFilter",
                     pluginId: args.pluginId,
                     filters: args.filters,
                 };
                 await enqueueGlobeCommand(userId, sessionId, cmd);
+
+                if (!isKnown) {
+                    return textResult(
+                        `Command enqueued, but pluginId '${args.pluginId}' is not a recognized plugin. It may be ignored.`,
+                    );
+                }
                 return textResult(
                     `set_filter command enqueued for '${args.pluginId}' (${Object.keys(args.filters).length} filter(s))`,
                 );
@@ -104,6 +120,7 @@ export function registerFilterTools(
         "clear_filter",
         {
             description:
+                SESSION_REQUIRED_PREAMBLE +
                 "Clear active filters on the live globe. " +
                 "Prefer clear_filter over re-setting filters to empty values; omit pluginId to clear ALL filters across every plugin at once. " +
                 "Limitations: requires an active globe session; returns 'no active globe session to control' when no tab is live. " +
@@ -111,7 +128,7 @@ export function registerFilterTools(
                 "Output: 'clear_filter enqueued for <pluginId>' or 'clear_filter enqueued for ALL plugins'. " +
                 "Example: clear_filter({ pluginId: 'flights' }) or clear_filter({}).",
             inputSchema: {
-                pluginId: z.string().optional().describe("Plugin whose filters to clear. Omit to clear ALL filters on the globe."),
+                pluginId: pluginIdSchema.optional().describe("Plugin whose filters to clear. Omit to clear ALL filters on the globe."),
                 sessionId: z.string().optional().describe("Target globe session id. Omit to target most-recently-active tab."),
             },
         },
@@ -149,7 +166,7 @@ export function registerFilterTools(
                 "Output: { available: true, filters: FilterDefinition[] } when the plugin is loaded, where each FilterDefinition is { id, label, type: 'text'|'select'|'range'|'boolean', propertyKey, options?, range? }; or { available: false, reason: 'plugin not loaded' | 'no_session_active' } when unavailable. " +
                 "Example: get_plugin_filters({ pluginId: 'flights' }) -> { available: true, filters: [{ id: 'status', label: 'Status', type: 'select', options: [...] }] }.",
             inputSchema: {
-                pluginId: z.string().min(1).describe("Plugin to inspect for declared filterable fields"),
+                pluginId: pluginIdSchema.describe("Plugin to inspect for declared filterable fields"),
             },
         },
         async (args) => {

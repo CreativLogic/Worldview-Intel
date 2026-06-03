@@ -1,94 +1,90 @@
-# Requirements: WorldWideView v1.4 Agentic Intelligence
+# Requirements: WorldWideView -- v1.5 MCP Public-Launch Hardening
 
-**Defined:** 2026-05-31
-**Core Value:** A single globe controllable by any AI agent via MCP -- where the agent arrives oriented, investigates intelligently, and acts with confidence.
+**Defined:** 2026-06-03
+**Core Value:** A single globe that shows everything happening in the world right now, extensible by anyone via plugins, and controllable by any AI agent via MCP.
 
-## v1.3 Requirements (shipped)
+Derived from the public-launch premortem. Closes the blockers that make the MCP server unsafe or dishonest to expose to untrusted, authenticated public users.
 
-All v1.3 requirements are complete. See archive for details.
+## v1 Requirements
 
-## v1.4 Requirements
+### Transport Resilience (Phase 31)
 
-### INST -- Server Instructions & Orientation
+- [x] **TRANS-01**: Every MCP failure path (auth throw, malformed JSON-RPC, tool throw, Redis/DB down during request handling) returns a well-formed JSON-RPC error (-32603, id:null, HTTP 500) instead of a bare 500 / empty body.
+- [x] **TRANS-02**: A database outage during API-key auth returns a clean 401 (authenticateApiKey returns null) rather than throwing.
+- [x] **TRANS-03**: The MCP route declares an explicit maxDuration above the 10s plugin-relay blpop so platform timeouts never truncate a blocked plugin call into a non-JSON-RPC error.
+- [x] **TRANS-04**: The server no longer advertises tools.listChanged unless it emits the notification; the stateless "re-call tools/list after enabling plugins" contract is documented in the server instructions.
 
-- [x] **INST-01**: MCP server returns a populated `instructions` field in InitializeResult containing a role-framing markdown document that tells agents who WWV is, what tools are available, and the mental model for using them
-- [x] **INST-02**: The `instructions` document embeds canonical workflow sequences: geocode-first before fly_to, check plugin availability before querying entities, read globe://sessions before sending any command tool
-- [x] **INST-03**: MCP server registers an `orient-globe` Prompt that agents can invoke to get a structured snapshot of current sessions, active layers, and loaded plugins in one response
-- [x] **INST-04**: MCP server registers an `investigate` Prompt that accepts a place name and guides the agent step-by-step through geocode -> plugin availability check -> region query -> globe action
+### Security and Abuse-Resistance (Phase 32)
 
-### DESC -- Tool Description Rewrite (6-component standard)
+- [x] **SEC-01**: In cloud/demo editions the server requires a dedicated API_KEY_HMAC_SECRET and fails startup if it is unset or equal to AUTH_SECRET; local dev preserves the AUTH_SECRET fallback.
+- [x] **SEC-02**: MCP tool calls are rate-limited per-userId/per-key via Redis (not only per-IP).
+- [x] **SEC-03**: Client IP is derived from a trusted-proxy source so rate limiters cannot be bypassed via a spoofed X-Forwarded-For header.
+- [x] **SEC-04**: Favorites are capped per user and all identifier/string tool inputs (entityId, pluginId, layerId, name, notes) have max-length and charset bounds in the Zod schemas and in isValidGlobeCommand.
 
-Tool descriptions must include: (1) purpose verb+object front-loaded, (2) when-to-use vs. alternatives, (3) limitations and empty-result meaning, (4) parameter format + ranges, (5) concrete examples, (6) appropriate length (not truncated at the key sentence).
+### Tool Honesty and Agent UX (Phase 33)
 
-- [x] **DESC-01**: All globe command tools rewritten to 6-component standard: `pan_globe`, `fly_to`, `focus_entity`, `toggle_layer`, `set_timeline` -- each includes sessions precondition inline and distinguishes from its nearest alternative
-- [x] **DESC-02**: All data query tools rewritten to 6-component standard: `search_entities`, `get_entities_in_region`, `get_entity_details`, `get_plugin_data` -- each includes plugin-availability note and explanation of what empty results mean
-- [x] **DESC-03**: All v1.3 tools rewritten to 6-component standard: `geocode_location`, `set_filter`, `clear_filter`, `get_plugin_filters`, `save_favorite`, `list_favorites`, `remove_favorite`
+- [x] **TOOL-01**: Session-independent data-query tools never report emptyReason "no_session_active"; they return the true reason (no_data_matches, engine_unreachable, or no_active_plugins).
+- [x] **TOOL-02**: toggle_layer and set_filter validate the id against the live plugin set and return an explicit "enqueued but id not recognized" warning instead of success-shaped text; focus_entity resolves entityId to coordinates server-side.
+- [x] **TOOL-03**: get_entities_in_region returns count and a truncated flag, tightens the radiusKmToBbox bounds, and documents that capped results are an unordered sample.
+- [x] **TOOL-04**: investigate_area and get_plugin_data cap total entity output and set a truncated flag so a single response cannot blow client context.
+- [x] **TOOL-05**: MCP_SERVER_INSTRUCTIONS matches the actual response shapes (emptyReason, {plugins, reason}), and list_available_plugins distinguishes engine_unreachable from no_active_plugins.
 
-### RESP -- Smart Response Contracts
+### Observability (Phase 34)
 
-- [x] **RESP-01**: All query tools (`search_entities`, `get_entities_in_region`, `get_entity_details`, `get_plugin_data`) include an `emptyReason` field when results are empty: `"plugin_not_streaming"` | `"no_data_matches"` | `"no_session_active"`
-- [x] **RESP-02**: `get_plugin_filters` returns `{ available: false, reason: "plugin not loaded" }` (not an empty array) when the requested plugin is not active in the engine
+- [x] **OBS-01**: /api/health actively probes Redis, the database, and the data-engine manifest, returning a degraded status when any dependency is down.
 
-### TOOL -- New Compound & Discovery Tools
+### Deployment Wiring (Phase 35)
 
-- [x] **TOOL-01**: `list_available_plugins` MCP tool returns which plugins are currently streaming data to the engine, including entity counts and queryable entity types per plugin -- agents call this before attempting any data query
-- [x] **TOOL-02**: `get_globe_context` MCP tool returns a full orientation snapshot in one call: active session count, camera position, active layers, applied filters, loaded plugin list -- replaces reading multiple resources separately
-- [x] **TOOL-03**: `investigate_area(place_name, entity_type, radius_km?)` compound MCP tool that internally geocodes the place, checks which plugins are streaming the entity type, queries the bounding region, positions the globe camera, and returns both the entity list and a prose situation summary
+- [x] **DEPLOY-01**: The production compose template provisions/wires Redis via REDIS_URL so sessions, command queue, geocode cache, and rate limiters work in production.
+- [x] **DEPLOY-02**: WWV_DATA_ENGINE_URL is set to the engine REST base (not the NEXT_PUBLIC_.../stream WS URL) in compose/env templates so MCP data tools reach /manifest.
+- [x] **DEPLOY-03**: A single global Nominatim throttle (<=1 rps) protects the shared geocoder, and the geocode cache path is confirmed live.
+- [x] **DEPLOY-04**: An INFRA-CHECKLIST.md documents the Coolify actions the operator must apply (managed Redis rediss://, REDIS_URL, WWV_DATA_ENGINE_URL, API_KEY_HMAC_SECRET distinct from AUTH_SECRET).
 
-### CRUD -- Full Favorites Lifecycle
+### Onboarding and Framing (Phase 36)
 
-- [x] **CRUD-01**: `update_favorite(favoriteId, { name?, notes? })` MCP tool allows agents to rename or annotate a saved bookmark without deleting and re-creating it -- completes Create/Read/Update/Delete lifecycle for favorites
-
-## Future Requirements (deferred)
-
-### Plugin Marketplace Integration
-
-- PLG-01: `list_plugins` MCP tool showing available marketplace plugins
-- PLG-02: `install_plugin` MCP tool to install a plugin from the marketplace
-- UX-01: ConnectAgentHelper upgrade CTA in demo edition
-
-### Advanced Investigation
-
-- Multi-turn investigation memory (agent remembers prior findings across sessions)
-- Proactive monitoring (agent watches for changes and alerts)
-- Saved investigation reports (persistent CRUD for investigation outputs)
-- Filter presets (save/apply named filter configurations)
+- [x] **ONBRD-01**: A public quickstart doc walks a new user from sign-up to a working MCP connection (generate key, paste JSON, open the globe tab).
+- [x] **ONBRD-02**: ConnectAgentHelper states the hard prerequisites: signed-in account, a browser tab open for command tools, cloud edition.
+- [x] **ONBRD-03**: Every command-tool description states the live-open-session requirement unmissably.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Embedding AI chat UI in the globe | MCP is server-only; chat is the client's job |
-| Browser-side MCP client | Globe is an MCP server target, not client |
-| Playwright / computer-use control | SSE command bridge is the pattern |
-| Stdio MCP transport | HTTP/SSE for production deployability |
-| OAuth 2.1 for MCP auth | Personal API keys sufficient |
-| API key scopes/permissions/rotation | Revisit post-v1.4 |
-| Proactive monitoring / push alerts | Agent-pulls model only in v1.4 |
+| Headless / render-on-demand globe | Command tools require a live signed-in browser session; building a serverless globe is a large effort, deferred. Command tools keep current behavior. |
+| API key scopes / rotation flows | Carried over from prior milestones; not a public-launch blocker. |
+| Self-hosted geocoder | Global throttle is sufficient for launch; self-hosting Nominatim is a later option. |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INST-01 | Phase 26 | Complete |
-| INST-02 | Phase 26 | Complete |
-| INST-03 | Phase 26 | Complete |
-| INST-04 | Phase 26 | Complete |
-| DESC-01 | Phase 27 | Complete |
-| DESC-02 | Phase 27 | Complete |
-| DESC-03 | Phase 27 | Complete |
-| RESP-01 | Phase 28 | Complete |
-| RESP-02 | Phase 28 | Complete |
-| CRUD-01 | Phase 28 | Complete |
-| TOOL-01 | Phase 29 | Complete |
-| TOOL-02 | Phase 29 | Complete |
-| TOOL-03 | Phase 29 | Complete |
+| TRANS-01 | Phase 31 | Done |
+| TRANS-02 | Phase 31 | Done |
+| TRANS-03 | Phase 31 | Done |
+| TRANS-04 | Phase 31 | Done |
+| SEC-01 | Phase 32 | Done |
+| SEC-02 | Phase 32 | Done |
+| SEC-03 | Phase 32 | Done |
+| SEC-04 | Phase 32 | Done |
+| TOOL-01 | Phase 33 | Done |
+| TOOL-02 | Phase 33 | Done |
+| TOOL-03 | Phase 33 | Done |
+| TOOL-04 | Phase 33 | Done |
+| TOOL-05 | Phase 33 | Done |
+| OBS-01 | Phase 34 | Done |
+| DEPLOY-01 | Phase 35 | Done |
+| DEPLOY-02 | Phase 35 | Done |
+| DEPLOY-03 | Phase 35 | Done |
+| DEPLOY-04 | Phase 35 | Done |
+| ONBRD-01 | Phase 36 | Done |
+| ONBRD-02 | Phase 36 | Done |
+| ONBRD-03 | Phase 36 | Done |
 
 **Coverage:**
-- v1.4 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0 ✓
+- v1 requirements: 21 total
+- Mapped to phases: 21
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-05-31*
-*Last updated: 2026-05-31 after initial v1.4 definition*
+*Requirements defined: 2026-06-03*
+*Last updated: 2026-06-03 after v1.5 milestone start*

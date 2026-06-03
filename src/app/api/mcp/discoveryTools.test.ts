@@ -114,14 +114,15 @@ describe("list_available_plugins", () => {
         expect(parsed.plugins[0].entityTypes).toContain("status");
     });
 
-    it("returns { plugins: [], reason: 'engine unreachable' } when engine is down", async () => {
+    it("returns { plugins: [], reason: 'engine_unreachable' } when engine is down (TOOL-05)", async () => {
+        // In the test environment the probe fetch fails, so reason becomes engine_unreachable.
         mockGetAllSnapshots.mockResolvedValue([]);
 
         const result = await handlers["list_available_plugins"]({});
         const parsed = parsedOf(result) as { plugins: unknown[]; reason: string };
 
         expect(parsed.plugins).toHaveLength(0);
-        expect(parsed.reason).toBe("engine unreachable");
+        expect(parsed.reason).toBe("engine_unreachable");
     });
 });
 
@@ -261,5 +262,43 @@ describe("investigate_area", () => {
 
         expect(parsed.entities).toHaveLength(0);
         expect(parsed.summary).toContain("ZZZ_NONEXISTENT");
+    });
+
+    it("truncation (TOOL-04/P33): returns truncated:true and cappedTotal when result exceeds 200 cap", async () => {
+        // Two plugins both named with "vessel" substring so entity_type:"vessel" matches both.
+        // Each returns 110 entities = 220 total, exceeding INVESTIGATE_AREA_CAP (200).
+        const makeEntities = (pluginId: string, count: number) =>
+            Array.from({ length: count }, (_, i) => ({
+                id: `${pluginId}-${i}`,
+                pluginId,
+                latitude: 0,
+                longitude: 0,
+            }));
+
+        mockGetAllSnapshots.mockResolvedValue([
+            { pluginId: "vessel-ais", entities: [], timestamp: new Date() },
+            { pluginId: "vessel-cargo", entities: [], timestamp: new Date() },
+        ]);
+        mockGetEntitiesInRegion
+            .mockResolvedValueOnce({ entities: makeEntities("vessel-ais", 110) })
+            .mockResolvedValueOnce({ entities: makeEntities("vessel-cargo", 110) });
+        mockResolveActiveSessionId.mockResolvedValue(null);
+
+        const result = await handlers["investigate_area"]({
+            place_name: "Auckland",
+            entity_type: "vessel",
+        });
+        const parsed = parsedOf(result) as {
+            entities: unknown[];
+            count: number;
+            truncated?: boolean;
+            cappedTotal?: number;
+            summary: string;
+        };
+
+        expect(parsed.entities).toHaveLength(200);
+        expect(parsed.count).toBe(200);
+        expect(parsed.truncated).toBe(true);
+        expect(parsed.cappedTotal).toBe(220);
     });
 });

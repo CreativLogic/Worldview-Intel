@@ -11,16 +11,23 @@ import type { FilterValue } from "@/core/plugins/PluginTypes";
  * - no_session_active: the authenticated user has no active globe session.
  *   This value is emitted by the tool layer (which has access to userId),
  *   NEVER by the service layer.
+ *
+ * NOTE: data-query tools (search_entities, get_entities_in_region, get_entity_details,
+ * get_plugin_data) must NEVER emit no_session_active -- they are session-independent.
+ * Only session-required command/filter tools may produce this reason.
  */
 export type EmptyReason = "plugin_not_streaming" | "no_data_matches" | "no_session_active";
 
 /**
  * Discriminated result carrying a list of entities and an optional emptyReason.
  * emptyReason is ONLY present when entities.length === 0.
+ * totalMatched is set when results were capped (entities.length < totalMatched).
  */
 export interface QueryResult<T> {
     entities: T[];
     emptyReason?: EmptyReason;
+    /** Total entities that matched before the cap was applied. Present only when the result set was truncated. */
+    totalMatched?: number;
 }
 
 /**

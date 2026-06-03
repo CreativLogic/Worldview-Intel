@@ -31,6 +31,13 @@ import { isDemo } from "@/core/edition";
 import { authenticateApiKey } from "@/lib/apiKeyAuth";
 import { createMcpServer, registerOrientationPrompts } from "@/lib/mcp/server";
 import { mcpLimiter, getClientIp } from "@/lib/rateLimiters";
+import { redisSlidingWindow } from "@/lib/geocodingRateLimit";
+import {
+    demoBlockedResponse,
+    unauthorizedResponse,
+    rateLimitedResponse,
+    internalErrorResponse,
+} from "@/lib/mcp/mcpResponseHelpers";
 import { registerGlobeResources } from "./globeResources";
 import { registerDataQueryTools } from "@/lib/mcp/tools";
 import { registerGlobeCommandTools } from "./globeCommandTools";
@@ -42,38 +49,16 @@ import { registerFilterTools } from "./filterTools";
 import { registerDiscoveryTools } from "./discoveryTools";
 
 // ---------------------------------------------------------------------------
-// JSON-RPC 2.0 error response helpers
+// Route segment config (TRANS-03)
+// 30 s is comfortably above the 10 s blpop ceiling in RELAY_DEADLINE_MS so the
+// function never times out mid-relay. Vercel/Coolify honour this value.
 // ---------------------------------------------------------------------------
 
-/**
- * Returns 403 + JSON-RPC 2.0 body for the demo edition gate (MCP-04).
- * Runs BEFORE auth so the demo-admin FK write path is never reached.
- */
-function demoBlockedResponse(): Response {
-    return Response.json(
-        {
-            jsonrpc: "2.0",
-            error: { code: -32600, message: "MCP is not available in demo mode" },
-            id: null,
-        },
-        { status: 403 },
-    );
-}
+export const maxDuration = 30;
 
-/**
- * Returns 401 + JSON-RPC 2.0 body for missing / invalid Bearer token (MCP-03).
- * Content-Type is application/json (not plain text — Pitfall 3).
- */
-function unauthorizedResponse(): Response {
-    return Response.json(
-        {
-            jsonrpc: "2.0",
-            error: { code: -32600, message: "Unauthorized" },
-            id: null,
-        },
-        { status: 401 },
-    );
-}
+// Per-key rate-limit budget (SEC-02): 120 requests per 60-second window.
+const MCP_KEY_LIMIT = 120;
+const MCP_WINDOW_MS = 60_000;
 
 // ---------------------------------------------------------------------------
 // Header merge helper
@@ -160,6 +145,18 @@ async function handleMcpRequest(request: Request): Promise<Response> {
     }
 
     // ------------------------------------------------------------------
+    // Gate 3: Redis per-key rate limit (SEC-02).
+    // 120 req / 60s per authenticated key, complementing the coarse IP
+    // gate above. Fails OPEN on Redis outage so a broken Redis never
+    // blocks legit users.
+    // ------------------------------------------------------------------
+    const keyRateKey = `mcp:ratelimit:key:${authResult.keyId}`;
+    const keyLimit = await redisSlidingWindow(keyRateKey, MCP_KEY_LIMIT, MCP_WINDOW_MS);
+    if (!keyLimit.allowed) {
+        return rateLimitedResponse(keyLimit.retryAfterMs);
+    }
+
+    // ------------------------------------------------------------------
     // Build a FRESH server + transport per request (D-17-04, MCP-05).
     // STATELESS INVARIANT: never hoist these to module scope.
     // Do NOT cache server or transport between requests.
@@ -230,14 +227,32 @@ async function handleMcpRequest(request: Request): Promise<Response> {
 // Route exports (App Router)
 // ---------------------------------------------------------------------------
 
+/**
+ * Top-level error boundary (TRANS-01).
+ * Any throw between auth and transport (DB outage, Redis rejection, unexpected
+ * SDK error) is caught here so MCP clients always receive a well-formed
+ * JSON-RPC -32603 frame instead of a bare HTML 500.
+ * The bearer token/secret is never logged.
+ */
+async function safeHandleMcpRequest(request: Request): Promise<Response> {
+    try {
+        return await handleMcpRequest(request);
+    } catch (err: unknown) {
+        const name = err instanceof Error ? err.name : "unknown";
+        const detail = process.env.NODE_ENV !== "production" && err instanceof Error ? ` ${err.message}` : "";
+        console.error(`[mcp] unhandled error in request handler: ${name}${detail}`);
+        return internalErrorResponse();
+    }
+}
+
 export async function GET(request: Request): Promise<Response> {
-    return handleMcpRequest(request);
+    return safeHandleMcpRequest(request);
 }
 
 export async function POST(request: Request): Promise<Response> {
-    return handleMcpRequest(request);
+    return safeHandleMcpRequest(request);
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-    return handleMcpRequest(request);
+    return safeHandleMcpRequest(request);
 }

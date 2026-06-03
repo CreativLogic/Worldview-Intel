@@ -1,4 +1,5 @@
 import type { FilterValue } from "@/core/plugins/PluginTypes";
+import { PLUGIN_ID_MAX, PLUGIN_ID_RE, ENTITY_ID_MAX } from "@/lib/mcp/identifierSchemas";
 
 // Must stay in sync with the TimeWindow union in @worldwideview/wwv-plugin-sdk.
 export const TIME_WINDOW_VALUES = ["1h", "6h", "24h", "48h", "7d"] as const;
@@ -29,16 +30,25 @@ function isValidAlt(v: unknown): v is number {
     return isNumber(v) && v > 0;
 }
 
-function isString(v: unknown): v is string {
-    return typeof v === "string";
+// SEC-04: bounds come from identifierSchemas.ts (single source of truth)
+function isValidPluginOrLayerId(v: unknown): v is string {
+    return typeof v === "string" && v.length > 0 && v.length <= PLUGIN_ID_MAX && PLUGIN_ID_RE.test(v);
+}
+
+function isValidEntityId(v: unknown): v is string {
+    return typeof v === "string" && v.length > 0 && v.length <= ENTITY_ID_MAX && !/[\x00-\x1F\x7F]/.test(v);
+}
+
+function isOptionalEntityId(v: unknown): boolean {
+    return v === undefined || isValidEntityId(v);
+}
+
+function isOptionalPluginOrLayerId(v: unknown): boolean {
+    return v === undefined || isValidPluginOrLayerId(v);
 }
 
 function isOptionalNumber(v: unknown): boolean {
     return v === undefined || isNumber(v);
-}
-
-function isOptionalString(v: unknown): boolean {
-    return v === undefined || isString(v);
 }
 
 function isOptionalBoolean(v: unknown): boolean {
@@ -100,14 +110,14 @@ export function isValidGlobeCommand(obj: unknown): obj is GlobeCommand {
 
         case "focusEntity":
             return (
-                isOptionalString(cmd["entityId"]) &&
+                isOptionalEntityId(cmd["entityId"]) &&
                 (cmd["lat"] === undefined || isValidLat(cmd["lat"])) &&
                 (cmd["lon"] === undefined || isValidLon(cmd["lon"]))
             );
 
         case "toggleLayer":
             return (
-                isString(cmd["layerId"]) &&
+                isValidPluginOrLayerId(cmd["layerId"]) &&
                 isOptionalBoolean(cmd["enabled"])
             );
 
@@ -136,14 +146,14 @@ export function isValidGlobeCommand(obj: unknown): obj is GlobeCommand {
         }
 
         case "setFilter": {
-            if (typeof cmd["pluginId"] !== "string" || cmd["pluginId"] === "") return false;
+            if (!isValidPluginOrLayerId(cmd["pluginId"])) return false;
             const filters = cmd["filters"];
             if (filters === null || typeof filters !== "object" || Array.isArray(filters)) return false;
             return Object.values(filters as Record<string, unknown>).every(isValidFilterValue);
         }
 
         case "clearFilter":
-            return isOptionalString(cmd["pluginId"]);
+            return isOptionalPluginOrLayerId(cmd["pluginId"]);
 
         default:
             return false;

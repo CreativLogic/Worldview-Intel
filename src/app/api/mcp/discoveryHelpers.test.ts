@@ -76,6 +76,21 @@ describe("radiusKmToBbox", () => {
         expect(bbox.east).toBeCloseTo(11, 1);
         expect(bbox.west).toBeCloseTo(9, 1);
     });
+
+    it("globe-spanning radius (30000 km) produces full-longitude box, not antimeridian strip", () => {
+        // Without the lonDelta cap a 30000 km radius produces lonDelta >> 180,
+        // and wrapLon(lon + lonDelta) collapses to a tiny strip near the antimeridian.
+        // With the cap, lonDelta = 180, so east and west both map to the antimeridian
+        // (+180 and -180 are the same line). The key invariant is that the longitude
+        // span equals 360 degrees (east - west mod 360 = 0 = full globe).
+        const bbox = radiusKmToBbox(0, 0, 30000);
+        // Both east and west land on the antimeridian (180 = -180 in wrapped coords).
+        const normalise = (v: number) => Math.abs(Math.abs(v) - 180);
+        expect(normalise(bbox.east)).toBeCloseTo(0, 4);
+        expect(normalise(bbox.west)).toBeCloseTo(0, 4);
+        expect(bbox.north).toBeCloseTo(90, 0);
+        expect(bbox.south).toBeCloseTo(-90, 0);
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -147,11 +162,28 @@ describe("listStreamingPlugins", () => {
         expect(result.plugins[0].entityCount).toBe(1);
     });
 
-    it("returns { plugins: [], reason: 'engine unreachable' } when no snapshots", async () => {
+    it("returns { plugins: [], reason: 'engine_unreachable' } when no snapshots and engine not reachable (TOOL-05)", async () => {
+        // In the test environment the probe fetch fails, so engineReachable=false -> engine_unreachable.
         mockGetAllSnapshots.mockResolvedValue([]);
         const result = await listStreamingPlugins();
         expect(result.plugins).toHaveLength(0);
-        expect(result.reason).toBe("engine unreachable");
+        expect(result.reason).toBe("engine_unreachable");
+    });
+
+    it("returns no_active_plugins when engine reachable but zero snapshots (TOOL-05)", async () => {
+        // Mock fetch to simulate engine responding OK (reachable, but no plugins).
+        const savedFetch = global.fetch;
+        global.fetch = vi.fn().mockResolvedValue(
+            new Response(JSON.stringify({ plugins: [] }), { status: 200 }),
+        );
+        try {
+            mockGetAllSnapshots.mockResolvedValue([]);
+            const result = await listStreamingPlugins();
+            expect(result.plugins).toHaveLength(0);
+            expect(result.reason).toBe("no_active_plugins");
+        } finally {
+            global.fetch = savedFetch;
+        }
     });
 });
 
@@ -263,15 +295,15 @@ describe("listStreamingPlugins -- source tagging", () => {
         expect(byId["camera"]).toBe("local");
     });
 
-    it("engine-unreachable passthrough: empty snapshots still returns { plugins: [], reason: 'engine unreachable' }", async () => {
+    it("engine-unreachable passthrough: empty snapshots returns engine_unreachable when probe fails (TOOL-05)", async () => {
+        // In the test environment the probe fetch fails, so reason becomes engine_unreachable.
         mockGetAllSnapshots.mockResolvedValue([]);
-        // localIds irrelevant when snapshots list is empty
         mockGetLocalSourceIds.mockResolvedValue(new Set(["camera"]));
 
         const result = await listStreamingPlugins();
 
         expect(result.plugins).toHaveLength(0);
-        expect(result.reason).toBe("engine unreachable");
+        expect(result.reason).toBe("engine_unreachable");
     });
 });
 

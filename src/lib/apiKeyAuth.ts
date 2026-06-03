@@ -1,14 +1,38 @@
 import { randomBytes, createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
+import { edition } from "@/core/edition";
+import { isSigningKeyValid } from "@/lib/signingKeyConfig";
 
 // ---------------------------------------------------------------------------
 // Signing key for HMAC-SHA256 hashing of API key secrets.
 // API_KEY_HMAC_SECRET is the preferred dedicated variable.
-// Falls back to AUTH_SECRET so local dev works without adding a new .env entry.
+// Falls back to AUTH_SECRET in local edition only, so dev works without a
+// separate .env entry.
+//
+// Lazy enforcement (not a bare module-level throw): Next.js evaluates module
+// code at build time and during edge prerender. A top-level throw would break
+// `next build` in environments where these env vars are not yet populated.
+// Throwing inside the function means the check fires only on the first real
+// auth call, where a missing/shared key is an actual runtime problem.
 // ---------------------------------------------------------------------------
 
 function getSigningKey(): string {
-    const key = process.env.API_KEY_HMAC_SECRET ?? process.env.AUTH_SECRET;
+    const dedicated = process.env.API_KEY_HMAC_SECRET;
+    const fallback = process.env.AUTH_SECRET;
+
+    if (edition === "cloud" || edition === "demo") {
+        if (!isSigningKeyValid()) {
+            throw new Error(
+                `API_KEY_HMAC_SECRET must be set and distinct from AUTH_SECRET in ${edition} edition`,
+            );
+        }
+        // isSigningKeyValid() returning true guarantees dedicated is set and
+        // distinct from AUTH_SECRET for cloud/demo editions.
+        return dedicated as string;
+    }
+
+    // local edition: allow AUTH_SECRET fallback for convenience
+    const key = dedicated ?? fallback;
     if (!key) throw new Error("API_KEY_HMAC_SECRET (or AUTH_SECRET) must be set");
     return key;
 }
@@ -116,10 +140,18 @@ export async function authenticateApiKey(
     const prefix = token.substring(0, dotIdx);
     const secret = token.substring(dotIdx + 1);
 
-    const row = await prisma.userApiKey.findUnique({
-        where: { prefix },
-        select: { id: true, userId: true, hashedSecret: true },
-    });
+    // DB outage guard (TRANS-02): a rejected Prisma call is treated as a miss
+    // so the caller receives null (-> 401) rather than an unhandled rejection.
+    let row: { id: string; userId: string; hashedSecret: string } | null;
+    try {
+        row = await prisma.userApiKey.findUnique({
+            where: { prefix },
+            select: { id: true, userId: true, hashedSecret: true },
+        });
+    } catch (err) {
+        console.warn("[apiKeyAuth] DB error during key lookup:", err instanceof Error ? err.name : "unknown");
+        return null;
+    }
 
     // Compute HMAC of the supplied secret, then compare with timingSafeEqual.
     // On a prefix miss we compare against a dummy digest — constant-work on
