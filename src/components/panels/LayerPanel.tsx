@@ -16,6 +16,7 @@ import { useStore } from "@/core/state/store";
 import { useIsMobile } from "@/core/hooks/useIsMobile";
 import { useResizablePanel } from "@/core/hooks/useResizablePanel";
 import { pluginManager } from "@/core/plugins/PluginManager";
+import { setLayerActive } from "@/core/plugins/layerActivation";
 import { ImportPanel } from "@/plugins/geojson/ImportPanel";
 import { DiscordIcon } from "@/components/common/DiscordIcon";
 import { trackEvent } from "@/lib/analytics";
@@ -81,27 +82,12 @@ export function LayerPanel() {
 
     const handleToggle = (pluginId: string) => {
         const isEnabled = layers[pluginId]?.enabled;
-        if (isEnabled) {
-            pluginManager.disablePlugin(pluginId);
-            useStore.getState().setLayerEnabled(pluginId, false);
-            useStore.getState().clearEntities(pluginId);
-            useStore.getState().setEntityCount(pluginId, 0);
-            // Clear hovered/selected if they belong to this layer
-            const state = useStore.getState();
-            if (state.hoveredEntity?.pluginId === pluginId) {
-                state.setHoveredEntity(null, null);
-            }
-            if (state.selectedEntity?.pluginId === pluginId) {
-                state.setSelectedEntity(null);
-            }
-        } else {
-            pluginManager.enablePlugin(pluginId);
-            useStore.getState().setLayerEnabled(pluginId, true);
+        setLayerActive(pluginId, !isEnabled);
+        if (!isEnabled) {
+            // UI-panel-specific concerns: open config panel and focus the new layer
             useStore.getState().setHighlightLayerId(pluginId);
             useStore.getState().setSelectedEntity(null);
             useStore.getState().setConfigPanelOpen(true);
-
-            // Check if plugin requires configuration
             const managed = pluginManager.getPlugin(pluginId);
             const settings = useStore.getState().dataConfig.pluginSettings[pluginId];
             if (managed?.plugin.requiresConfiguration?.(settings)) {

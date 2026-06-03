@@ -7,6 +7,8 @@
  *   BRIDGE-01  Hook opens EventSource to /api/globe/commands/stream?sessionId=... on mount
  *   BRIDGE-02  pan command dispatched via onmessage -> dataBus.emit("cameraGoTo", ...)
  *   BRIDGE-03  toggleLayer command dispatched via onmessage -> Zustand setLayerEnabled
+ *   BRIDGE-03a toggleLayer {enabled:true} -> pluginManager.enablePlugin called
+ *   BRIDGE-03b toggleLayer {enabled:false} -> pluginManager.disablePlugin called
  *   BRIDGE-04  Unknown command type via onmessage -> nothing dispatched
  *   BRIDGE-05  Empty sessionId -> EventSource never created
  *   BRIDGE-06  Unmount -> EventSource.close() called
@@ -32,6 +34,22 @@ vi.mock("@/core/data/DataBus", () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock PluginManager
+// ---------------------------------------------------------------------------
+
+const { mockEnablePlugin, mockDisablePlugin } = vi.hoisted(() => ({
+    mockEnablePlugin: vi.fn(() => Promise.resolve()),
+    mockDisablePlugin: vi.fn(),
+}));
+
+vi.mock("@/core/plugins/PluginManager", () => ({
+    pluginManager: {
+        enablePlugin: mockEnablePlugin,
+        disablePlugin: mockDisablePlugin,
+    },
+}));
+
+// ---------------------------------------------------------------------------
 // Mock Zustand store
 // ---------------------------------------------------------------------------
 
@@ -41,12 +59,20 @@ const {
     mockSetTimeWindow,
     mockSetPlaybackMode,
     mockSetCurrentTime,
+    mockClearEntities,
+    mockSetEntityCount,
+    mockSetHoveredEntity,
+    mockSetSelectedEntity,
 } = vi.hoisted(() => ({
     mockSetLayerEnabled: vi.fn(),
     mockToggleLayer: vi.fn(),
     mockSetTimeWindow: vi.fn(),
     mockSetPlaybackMode: vi.fn(),
     mockSetCurrentTime: vi.fn(),
+    mockClearEntities: vi.fn(),
+    mockSetEntityCount: vi.fn(),
+    mockSetHoveredEntity: vi.fn(),
+    mockSetSelectedEntity: vi.fn(),
 }));
 
 vi.mock("@/core/state/store", () => ({
@@ -57,7 +83,13 @@ vi.mock("@/core/state/store", () => ({
             setTimeWindow: mockSetTimeWindow,
             setPlaybackMode: mockSetPlaybackMode,
             setCurrentTime: mockSetCurrentTime,
+            clearEntities: mockClearEntities,
+            setEntityCount: mockSetEntityCount,
+            setHoveredEntity: mockSetHoveredEntity,
+            setSelectedEntity: mockSetSelectedEntity,
             layers: {},
+            hoveredEntity: null,
+            selectedEntity: null,
         })),
         subscribe: vi.fn(() => () => undefined),
     },
@@ -106,7 +138,13 @@ beforeEach(() => {
         setTimeWindow: mockSetTimeWindow,
         setPlaybackMode: mockSetPlaybackMode,
         setCurrentTime: mockSetCurrentTime,
+        clearEntities: mockClearEntities,
+        setEntityCount: mockSetEntityCount,
+        setHoveredEntity: mockSetHoveredEntity,
+        setSelectedEntity: mockSetSelectedEntity,
         layers: {},
+        hoveredEntity: null,
+        selectedEntity: null,
     });
 });
 
@@ -174,6 +212,54 @@ describe("useGlobeCommandBridge toggleLayer dispatch (BRIDGE-03)", () => {
             mockSetLayerEnabled.mock.calls.length > 0 ||
             mockToggleLayer.mock.calls.length > 0;
         expect(anyLayerAction).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// BRIDGE-03a: toggleLayer {enabled:true} -> pluginManager.enablePlugin
+// ---------------------------------------------------------------------------
+
+describe("useGlobeCommandBridge toggleLayer enable (BRIDGE-03a)", () => {
+    it("calls pluginManager.enablePlugin when toggleLayer {enabled:true} arrives", () => {
+        renderHook(() => useGlobeCommandBridge("sess-1"));
+
+        act(() => {
+            mockEs.onmessage?.(
+                new MessageEvent("message", {
+                    data: JSON.stringify({
+                        commands: [{ type: "toggleLayer", layerId: "camera", enabled: true }],
+                    }),
+                }),
+            );
+        });
+
+        expect(mockEnablePlugin).toHaveBeenCalledWith("camera");
+        expect(mockSetLayerEnabled).toHaveBeenCalledWith("camera", true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// BRIDGE-03b: toggleLayer {enabled:false} -> pluginManager.disablePlugin
+// ---------------------------------------------------------------------------
+
+describe("useGlobeCommandBridge toggleLayer disable (BRIDGE-03b)", () => {
+    it("calls pluginManager.disablePlugin when toggleLayer {enabled:false} arrives", () => {
+        renderHook(() => useGlobeCommandBridge("sess-1"));
+
+        act(() => {
+            mockEs.onmessage?.(
+                new MessageEvent("message", {
+                    data: JSON.stringify({
+                        commands: [{ type: "toggleLayer", layerId: "camera", enabled: false }],
+                    }),
+                }),
+            );
+        });
+
+        expect(mockDisablePlugin).toHaveBeenCalledWith("camera");
+        expect(mockSetLayerEnabled).toHaveBeenCalledWith("camera", false);
+        expect(mockClearEntities).toHaveBeenCalledWith("camera");
+        expect(mockSetEntityCount).toHaveBeenCalledWith("camera", 0);
     });
 });
 

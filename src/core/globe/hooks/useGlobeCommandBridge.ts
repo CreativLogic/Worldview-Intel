@@ -3,6 +3,7 @@ import { dataBus } from "@/core/data/DataBus";
 import { useStore } from "@/core/state/store";
 import { isValidGlobeCommand } from "@/core/globe/types/GlobeCommand";
 import type { GlobeCommand } from "@/core/globe/types/GlobeCommand";
+import { setLayerActive } from "@/core/plugins/layerActivation";
 
 function dispatchCommand(cmd: GlobeCommand): void {
     switch (cmd.type) {
@@ -49,11 +50,11 @@ function dispatchCommand(cmd: GlobeCommand): void {
             break;
 
         case "toggleLayer": {
-            const state = useStore.getState();
             if (cmd.enabled !== undefined) {
-                state.setLayerEnabled(cmd.layerId, cmd.enabled);
+                setLayerActive(cmd.layerId, cmd.enabled);
             } else {
-                state.toggleLayer(cmd.layerId);
+                const current = useStore.getState().layers[cmd.layerId]?.enabled ?? false;
+                setLayerActive(cmd.layerId, !current);
             }
             break;
         }
