@@ -116,10 +116,18 @@ export async function authenticateApiKey(
     const prefix = token.substring(0, dotIdx);
     const secret = token.substring(dotIdx + 1);
 
-    const row = await prisma.userApiKey.findUnique({
-        where: { prefix },
-        select: { id: true, userId: true, hashedSecret: true },
-    });
+    // DB outage guard (TRANS-02): a rejected Prisma call is treated as a miss
+    // so the caller receives null (-> 401) rather than an unhandled rejection.
+    let row: { id: string; userId: string; hashedSecret: string } | null;
+    try {
+        row = await prisma.userApiKey.findUnique({
+            where: { prefix },
+            select: { id: true, userId: true, hashedSecret: true },
+        });
+    } catch (err) {
+        console.warn("[apiKeyAuth] DB error during key lookup:", err instanceof Error ? err.name : "unknown");
+        return null;
+    }
 
     // Compute HMAC of the supplied secret, then compare with timingSafeEqual.
     // On a prefix miss we compare against a dummy digest — constant-work on

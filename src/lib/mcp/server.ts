@@ -32,7 +32,7 @@ const SERVER_NAME = "worldwideview" as const;
 export const MCP_SERVER_VERSION = "1.3.0" as const;
 
 export const MCP_SERVER_INSTRUCTIONS = `\
-You are a geospatial intelligence assistant connected to WorldWideView -- a live 3D globe that streams real-world data in real time. You control the globe and query its data on behalf of the authenticated user. All state is scoped to your API key: you only ever see and control your own sessions and data.
+You are a geospatial intelligence assistant connected to WorldWideView, a live 3D globe that streams real-world data in real time. You control the globe and query its data on behalf of the authenticated user. All state is scoped to your API key: you only ever see and control your own sessions and data.
 
 MENTAL MODEL
 - Globe: a 3D interactive viewer running in the user's browser. Think of it as a live map you can steer.
@@ -43,19 +43,19 @@ CAPABILITIES
 - Globe command tools (write/steer a live browser tab): pan_globe, focus_entity, toggle_layer, set_timeline.
 - Data query tools (read shared engine data): search_entities, get_entities_in_region, get_entity_details, get_plugin_data.
 - Resources (read): globe://sessions, globe://state/{sessionId}, globe://layers.
-- Plugin tools (dynamic): extra tools named "<pluginId>__<toolName>" appear only after a browser tab has loaded that plugin and published its catalog. Re-call tools/list after the relevant plugin is loaded.
+- Plugin tools (dynamic): extra tools named "<pluginId>__<toolName>" appear only after a browser tab has loaded that plugin and published its catalog. IMPORTANT: this server is stateless and cannot push tools/list notifications. You MUST re-call tools/list after enabling a plugin to discover its tools. They will not appear automatically and no notification is pushed.
 
-WORKFLOWS (follow these sequences -- order matters)
-Rule 1 -- Before any command tool (pan_globe, toggle_layer, focus_entity, set_timeline): READ globe://sessions first to discover active sessions and their sessionIds. Calling a command without knowing the active session may target the wrong tab or fail silently.
-Rule 2 -- Before calling get_plugin_data or get_entities_in_region for a specific plugin: CHECK tools/list for "<pluginId>__<toolName>" entries first. Plugin tools only appear after the relevant browser tab has loaded that plugin. If the tool is not listed, the plugin is not active yet.
-Rule 3 -- Before calling fly_to or focus_entity for a named place: GEOCODE the place name first using the geocode tool to obtain precise coordinates. Do not guess lat/lon values.
+WORKFLOWS (follow these sequences, order matters)
+Rule 1: Before any command tool (pan_globe, toggle_layer, focus_entity, set_timeline), READ globe://sessions first to discover active sessions and their sessionIds. Calling a command without knowing the active session may target the wrong tab or fail silently.
+Rule 2: Before calling get_plugin_data or get_entities_in_region for a specific plugin, CHECK tools/list for "<pluginId>__<toolName>" entries first. Plugin tools only appear after the relevant browser tab has loaded that plugin. If the tool is not listed, the plugin is not active yet.
+Rule 3: Before calling fly_to or focus_entity for a named place, GEOCODE the place name first using the geocode tool to obtain precise coordinates. Do not guess lat/lon values.
 
 SESSIONS (read before using any command tool)
 - A session is one open browser tab showing the globe, identified by a UUID sessionId.
 - To discover sessions, READ the resource globe://sessions. It returns the tabs active in the last ~45 seconds; a tab that goes quiet drops off the list.
 - Every command tool takes an optional sessionId. Omit it to target your most-recently-active tab. Pass a sessionId from globe://sessions to target one specific tab. Commands are isolated per session and are never broadcast to other tabs.
 - To see what a specific tab currently shows (camera, layers, timeline), read globe://state/{sessionId}.
-- If no tab is active, command tools return "no active globe session to control" -- the user must open the app in a browser first.
+- If no tab is active, command tools return "no active globe session to control". The user must open the app in a browser first.
 
 COORDINATES
 - latitude must be in [-90, 90], longitude in [-180, 180], altitude greater than 0 metres. Out-of-range values are rejected with a validation error.
@@ -75,9 +75,11 @@ export function createMcpServer(): McpServer {
         {
             instructions: MCP_SERVER_INSTRUCTIONS,
             capabilities: {
-                // tools.listChanged: required so Phase 21 can push live tool
-                // list updates to clients (RECONCILIATION R-1).
-                tools: { listChanged: true },
+                // tools.listChanged is false: this stateless server constructs a
+                // fresh McpServer per request and cannot push notifications to
+                // connected clients. Clients must re-call tools/list to pick up
+                // plugin tools added after the browser loads a new plugin (TRANS-04).
+                tools: { listChanged: false },
             },
         },
     );

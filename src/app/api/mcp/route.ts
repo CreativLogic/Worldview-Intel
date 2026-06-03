@@ -42,6 +42,14 @@ import { registerFilterTools } from "./filterTools";
 import { registerDiscoveryTools } from "./discoveryTools";
 
 // ---------------------------------------------------------------------------
+// Route segment config (TRANS-03)
+// 30 s is comfortably above the 10 s blpop ceiling in RELAY_DEADLINE_MS so the
+// function never times out mid-relay. Vercel/Coolify honour this value.
+// ---------------------------------------------------------------------------
+
+export const maxDuration = 30;
+
+// ---------------------------------------------------------------------------
 // JSON-RPC 2.0 error response helpers
 // ---------------------------------------------------------------------------
 
@@ -72,6 +80,29 @@ function unauthorizedResponse(): Response {
             id: null,
         },
         { status: 401 },
+    );
+}
+
+/**
+ * Returns 500 + JSON-RPC 2.0 body for unexpected server errors (TRANS-01).
+ * Used by the top-level try/catch so MCP clients always receive a valid
+ * JSON-RPC error frame instead of a bare HTML 500 from Next.js.
+ */
+function internalErrorResponse(): Response {
+    return Response.json(
+        {
+            jsonrpc: "2.0",
+            id: null,
+            error: { code: -32603, message: "Internal error" },
+        },
+        {
+            status: 500,
+            headers: {
+                "X-Accel-Buffering": "no",
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+            },
+        },
     );
 }
 
@@ -230,14 +261,32 @@ async function handleMcpRequest(request: Request): Promise<Response> {
 // Route exports (App Router)
 // ---------------------------------------------------------------------------
 
+/**
+ * Top-level error boundary (TRANS-01).
+ * Any throw between auth and transport (DB outage, Redis rejection, unexpected
+ * SDK error) is caught here so MCP clients always receive a well-formed
+ * JSON-RPC -32603 frame instead of a bare HTML 500.
+ * The bearer token/secret is never logged.
+ */
+async function safeHandleMcpRequest(request: Request): Promise<Response> {
+    try {
+        return await handleMcpRequest(request);
+    } catch (err: unknown) {
+        const name = err instanceof Error ? err.name : "unknown";
+        const detail = process.env.NODE_ENV !== "production" && err instanceof Error ? ` ${err.message}` : "";
+        console.error(`[mcp] unhandled error in request handler: ${name}${detail}`);
+        return internalErrorResponse();
+    }
+}
+
 export async function GET(request: Request): Promise<Response> {
-    return handleMcpRequest(request);
+    return safeHandleMcpRequest(request);
 }
 
 export async function POST(request: Request): Promise<Response> {
-    return handleMcpRequest(request);
+    return safeHandleMcpRequest(request);
 }
 
 export async function DELETE(request: Request): Promise<Response> {
-    return handleMcpRequest(request);
+    return safeHandleMcpRequest(request);
 }

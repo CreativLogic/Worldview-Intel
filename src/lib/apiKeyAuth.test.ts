@@ -156,6 +156,17 @@ describe("authenticateApiKey", () => {
         // compare is well-defined and does not throw.
     });
 
+    it("returns null (does not throw) when Prisma findUnique rejects (DB outage — TRANS-02)", async () => {
+        vi.mocked(prisma.userApiKey.findUnique).mockRejectedValue(
+            new Error("Connection refused")
+        );
+        const req = new Request("http://localhost/api/test", {
+            headers: { authorization: "Bearer wwv_XXXXXXXX.fakesecret" },
+        });
+        // Must resolve to null, not reject
+        await expect(authenticateApiKey(req)).resolves.toBeNull();
+    });
+
     it("hashedSecret is never returned to callers — result only contains userId and keyId", async () => {
         const { prefix, secret, hashedSecret } = generateApiKey();
         vi.mocked(prisma.userApiKey.findUnique).mockResolvedValue({
