@@ -2,10 +2,8 @@
 description: Cloud edition implementation details, PostgreSQL Row-Level Security (RLS) isolation, cross-subdomain auth, and cryptographic license keys.
 paths:
   - "src/lib/auth*"
+  - "src/lib/auth/**/*"
   - "src/app/api/auth/**/*"
-  - "src/core/auth.ts"
-  - "src/core/storage.ts"
-  - "src/core/tenant.ts"
 ---
 
 > **SUPERSEDED by ADR-003** (`docs/architecture/decisions/adr-0003-shared-identity-and-ecosystem-auth-host.md`).
@@ -177,13 +175,15 @@ DATABASE_URL=postgresql://...
 
 ## Edition Adapters
 
-Three thin files are all that differs between editions — everything else is edition-unaware:
+Three thin adapter modules provide all edition-specific behaviour -- everything else is edition-unaware:
 
 | Adapter | Local | Cloud | Demo |
 |---|---|---|---|
-| `src/core/auth.ts` | Auth.js `Credentials` (bcrypt + PostgreSQL) | Auth.js `@auth/supabase-adapter` | Disabled |
-| `src/core/storage.ts` | `fs.writeFile()` to `data/` | Supabase Storage SDK | Read-only |
-| `src/core/tenant.ts` | No-op (single tenant) | Sets `app.tenant_id` for RLS | No-op |
+| `src/lib/auth.ts` | Auth.js `Credentials` (bcrypt + PostgreSQL) | Auth.js `@auth/supabase-adapter` | Disabled |
+| Storage adapter (planned) | `fs.writeFile()` to `data/` | Supabase Storage SDK | Read-only |
+| Tenant adapter (planned) | No-op (single tenant) | Sets `app.tenant_id` for RLS | No-op |
+
+> The storage and tenant adapters listed above are planned for the Cloud edition build-out and are not yet implemented as separate files. Auth is fully implemented in `src/lib/auth.ts` and `src/lib/auth.config.ts`.
 
 ---
 

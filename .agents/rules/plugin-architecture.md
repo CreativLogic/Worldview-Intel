@@ -237,7 +237,7 @@ GET marketplace.worldwideview.dev/api/registry
 - Trust is **always stamped server-side** — no client-side trust claims accepted
 - Registry response cached for **5 minutes** (in-memory on each WWV instance)
 - If registry unreachable, last cached result used; new unknowns default to `unverified`
-- **Managing:** Edit `src/data/verifiedPlugins.ts` in marketplace repo and redeploy
+- **Managing:** Use the marketplace admin API (`/api/admin/registry`) to manage the signed plugin registry. The old `src/data/verifiedPlugins.ts` static file was replaced by database-driven registry management.
 - **Revoking:** Remove plugin ID and redeploy — WWV instances drop trust on next cache refresh
 
 ### Unverified Plugin Warning
@@ -437,7 +437,7 @@ This queries Overpass API, converts to GeoJSON, scaffolds the package, and print
 | Power plants | `power=plant` | 15k |
 | Wind farms | `generator:source=wind` | 50k |
 
-See skill: `.agents/skills/osm-static-plugin-creation.md`
+The `osm-static-plugin-creation.md` skill was removed. Use `node packages/wwv-cli/dist/index.js create <name> --local` to scaffold a new plugin, then populate it with OSM data fetched via the Overpass API.
 
 ---
 
@@ -462,7 +462,7 @@ To solve this friction and make third-party plugin hosting highly intuitive, the
 2. **Backend SDK:** They write simple `.ts` fetch scripts returning `GeoEntity[]` and drop them into a mounted `/seeders` volume.
 3. **Zero Configuration:** The Docker engine hot-reloads these seeders, handles the Redis caching, and exposes standardized REST or WebSocket endpoints automatically. The developer focuses only on fetching data, avoiding all backend infrastructure setup.
 
-See skill: `.agents/skills/data-engine-seeder-creation.md`
+The `data-engine-seeder-creation.md` skill was removed. Seeder implementation rules are documented inline in `.agents/rules/data-engine-architecture.md`. Seeders live in `local-seeders/community/` or `local-seeders/private/` (separate git clones).
 
 ---
 

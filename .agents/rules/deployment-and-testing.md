@@ -206,18 +206,10 @@ Hard refresh: `Ctrl+Shift+R`
 
 ## Creating Static OSM Plugins
 
-See full guide: `.agents/skills/osm-static-plugin-creation.md`
+Use the `plugin-new` skill (`.agents/skills/plugin-new/SKILL.md`) to scaffold new plugins, including OSM-based static data plugins. The old `scaffold-osm-plugin.mjs` script and `osm-static-plugin-creation.md` skill were removed; static OSM plugins are now built as standard `bundle` format plugins via the wwv-cli:
 
-**Quick start:**
 ```bash
-node scripts/scaffold-osm-plugin.mjs '{
-  "name": "volcanoes",
-  "displayName": "Volcanoes",
-  "osmTag": "natural=volcano",
-  "icon": "Mountain",
-  "color": "#ef4444",
-  "category": "Natural Disaster"
-}'
+node packages/wwv-cli/dist/index.js create <name> --local
 ```
 
 **Manual Overpass API query (PowerShell):**
@@ -227,26 +219,29 @@ $body = "data=[out:json][timeout:300];(node[$tag];way[$tag];relation[$tag];);out
 Invoke-RestMethod -Uri 'https://overpass-api.de/api/interpreter' -Method Post -Body $body -OutFile 'tmp/raw_data.json'
 ```
 
-**Note:** OSM data is licensed under **ODbL** — include attribution in plugin READMEs.
+**Note:** OSM data is licensed under **ODbL** - include attribution in plugin READMEs.
 
 ---
 
 ## npm Plugin Publishing
 
-See full guide: `.agents/skills/version-control/npm-plugin-publishing.md`
+The `npm-plugin-publishing.md` skill was removed. Use the wwv-cli publish command:
 
 ```bash
-# First-time publish
+# Publish a local plugin
+node packages/wwv-cli/dist/index.js publish <name> [--org <your-org>]
+
+# Or publish directly via pnpm (for packages/ workspace members)
 pnpm publish --workspace=packages/wwv-plugin-<name> --access public
 
-# Future versions — via Trusted Publishing (GitHub Actions CI/CD)
+# Future versions via Trusted Publishing (GitHub Actions CI/CD)
 ```
 
 ---
 
 ## Git / Version Control
 
-See full guide: `.agents/skills/version-control/git-version-control.md`
+The `git-version-control.md` skill was removed. See `.agents/skills/using-git-worktrees/SKILL.md` for worktree workflows and `.agents/skills/branch-cleanup/SKILL.md` for the post-merge teardown flow.
 
 **Commit convention:** `feat:`, `fix:`, `chore:`, `docs:` prefixes.
 **Commit when:** A new feature is completed (per project rules).
@@ -255,7 +250,7 @@ See full guide: `.agents/skills/version-control/git-version-control.md`
 
 ## Security Checks
 
-See full guide: `.agents/skills/security/security-check.md`
+The `security-check.md` skill was removed. Security reviews are handled by the `security-reviewer` agent (`.agents/agents/security-reviewer.md`). Trigger it after any change touching auth routes, API routes, plugin loading, or marketplace flows.
 
 ---
 
