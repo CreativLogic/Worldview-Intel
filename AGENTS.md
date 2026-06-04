@@ -132,6 +132,7 @@ See `.agents/context/INDEX.md` for the full navigation table. Key files:
 | `/five` | Five Whys root cause analysis | `.agents/workflows/five.md` |
 | `/stitch-to-nextjs` | Generate UI with Stitch MCP, port into Next.js | `.agents/workflows/stitch-to-nextjs.md` |
 | `/branch-cleanup` | **Post-merge teardown** — commit leftovers, delete plan file, remove worktree via worktree-manager | `.agents/skills/branch-cleanup/SKILL.md` |
+| `/triage-issue` | Triage a single issue (plugin/feature/bug/question) per `TRIAGE.md`; confirm before any state change | `.agents/workflows/triage-issue.md` |
 
 ---
 
