@@ -18,18 +18,12 @@
 # Reuse the pattern from worldwideview/tests/global.setup.ts. DB migrations
 # are handled automatically by the wwv-app entrypoint at container start.
 #
-# ─── Known foundation gap (deferred) ───
+# ─── Stub seeder source ───
 #
-# The stub-seeder is mounted via `./stub-seeder:/app/seeders/community/stub-seeder`
-# below — a path RELATIVE to this compose file. When a consumer repo downloads
-# only this YAML, that path resolves to nothing. The clean fix is to bake the
-# stub-seeder into the `wwv-data-engine:ci` image at /app/seeders/community/__ci-stub__/
-# so the compose only needs to set STUB_PLUGIN_ID. That requires a coordinated
-# Dockerfile change in the wwv-data-engine repo — tracked as the next session's
-# first task.
-#
-# Until then, this compose only works when the worldwideview source tree
-# (with docker/ci/stub-seeder/) is the working directory.
+# The stub seeder is baked into the `wwv-data-engine:ci` image at
+# /app/seeders/stub (see wwv-data-engine/Dockerfile.ci). The compose only needs
+# to set STUB_PLUGIN_ID — no volume mount, so a consumer repo can download just
+# this YAML and run it without the worldwideview source tree present.
 #
 # Expected env vars from consuming workflow:
 #   PLUGIN_ID         — kebab-case id of the plugin under test (e.g. "aviation")
@@ -71,9 +65,9 @@ services:
       STUB_PLUGIN_ID: ${PLUGIN_ID}
       WWV_SKIP_WS_AUTH: "true"
       NODE_ENV: ci
-    volumes:
-      # Mount only the stub seeder — no other seeders to avoid contamination
-      - ./stub-seeder:/app/seeders/community/stub-seeder:ro
+    # No volume mount: the stub seeder is baked into the :ci image at
+    # /app/seeders/stub, so the engine discovers it as id "stub" with no host
+    # path dependency.
     depends_on:
       wwv-redis:
         condition: service_healthy

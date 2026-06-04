@@ -10,6 +10,11 @@ const pluginId = process.env.STUB_PLUGIN_ID;
 // When unconfigured (e.g. seeder-CI, where this stub is baked into the shared
 // :ci image but unused), export a nameless module so the seeder-loader skips
 // it instead of crashing the engine.
+//
+// Uses the interval+fetch seeder contract: fetch() RETURNS the array and the
+// scheduler auto-wraps it into a snapshot stored under the seeder id. The
+// cron+fn contract would require the engine-internal setLiveSnapshot, which is
+// NOT exposed on the seeder ctx (ctx is only { redis }).
 
 function makeEntities() {
   const now = new Date().toISOString();
@@ -40,11 +45,11 @@ function makeEntities() {
 export default pluginId
   ? {
       name: pluginId,
-      cron: "*/10 * * * * *",
-      fn: async (ctx) => {
+      interval: 10000,
+      fetch: async () => {
         const entities = makeEntities();
-        await ctx.setLiveSnapshot(pluginId, entities, 300);
-        console.log(`[stub-seeder] emitted ${entities.length} entities for ${pluginId}`);
+        console.log(`[stub-seeder] emitting ${entities.length} entities for ${pluginId}`);
+        return entities;
       },
     }
   : {};
