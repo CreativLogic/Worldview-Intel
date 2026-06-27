@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { isDemo, isHttpsDeployment } from "@/core/edition";
+import { hasBetterAuthCookie } from "@/lib/proxy-auth";
 
 const workspaceCache = new Map<string, { status: string; expiresAt: number }>();
 const CACHE_TTL = 60_000; // 60 seconds
@@ -26,6 +27,7 @@ const STATIC_ASSET_RE = /\.(?:js|mjs|cjs|css|map|json|txt|xml|webmanifest|ico|pn
 //  - glitchtip-tunnel/build/dev: telemetry/diagnostics (dev/* is NODE_ENV-gated to 403 in prod).
 const PUBLIC_API_PREFIXES = [
     "/api/auth",
+    "/api/ba",
     "/api/internal/workspace",
     "/api/health",
     "/api/billing/webhook",
@@ -137,8 +139,10 @@ export default async function proxy(req: NextRequest) {
             return res;
         }
 
+        // Dual-auth gate: EITHER NextAuth (existing users) OR Better Auth (migrated)
         const apiToken = await getSessionToken(req);
-        if (apiToken) {
+        const apiHasBA = hasBetterAuthCookie(req);
+        if (apiToken || apiHasBA) {
             if (tenantSubdomain) res.headers.set("x-tenant-subdomain", tenantSubdomain);
             return res;
         }
@@ -190,12 +194,13 @@ export default async function proxy(req: NextRequest) {
         }
     }
 
-    // Check the Auth.js session cookie for page requests (the helper handles the
-    // __Secure- cookie prefix used behind a TLS-terminating reverse proxy).
+    // Dual-auth gate: Check BOTH NextAuth (existing users) and Better Auth
+    // (migrated users). Either session passes through.
     const token = await getSessionToken(req);
+    const hasBA = hasBetterAuthCookie(req);
 
-    if (token) {
-        // User is logged in, allow through
+    if (token || hasBA) {
+        // User is logged in via either system, allow through
         const res = NextResponse.next();
         if (tenantSubdomain) res.headers.set("x-tenant-subdomain", tenantSubdomain);
         return res;

@@ -29,6 +29,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
     "@auth/supabase-adapter": "^1.11.2",
+    "@better-auth/prisma-adapter": "1.6.22",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
@@ -41,6 +42,7 @@
     "@worldwideview/wwv-lib-incidents": "workspace:*",
     "@worldwideview/wwv-plugin-sdk": "workspace:*",
     "bcryptjs": "^3.0.3",
+    "better-auth": "^1.6.22",
     "cesium": "^1.142.0",
     "cheerio": "^1.2.0",
     "hls.js": "^1.6.16",
