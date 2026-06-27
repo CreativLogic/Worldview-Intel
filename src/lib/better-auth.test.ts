@@ -85,15 +85,6 @@ beforeEach(async () => {
     auth = mod.auth;
 });
 
-// ---------------------------------------------------------------------------
-// Track total test count for plan verification
-// ---------------------------------------------------------------------------
-let testCount = { value: 0 };
-
-function countTests() {
-    testCount.value++;
-}
-
 describe("Better Auth instance", () => {
     it("exports an auth instance", () => {
         expect(auth).toBeDefined();
@@ -187,5 +178,64 @@ describe("Plugin configuration", () => {
         if (!validator) throw new Error("Validator not configured");
 
         await expect(validator("123")).rejects.toThrow();
+    });
+});
+
+describe("Plugin coexistence", () => {
+    it("has at least 4 plugins in the plugin chain", async () => {
+        vi.resetModules();
+        const mod = await import("@/lib/better-auth");
+        const authInstance = mod.auth;
+
+        const plugins = authInstance.options.plugins;
+        expect(plugins).toBeDefined();
+        expect(Array.isArray(plugins)).toBe(true);
+        // Minimum: 4 bundled plugins (org, admin, jwt, ott)
+        // With external: 6 total, but tests mock Stripe differently
+        expect(plugins.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("auth.api exposes methods from the auth instance", () => {
+        const api = auth.api;
+        expect(api).toBeDefined();
+        expect(typeof api.getSession).toBe("function");
+        // Plugins are lazy-loaded by Better Auth — we verify
+        // the auth instance initializes successfully
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("has all routes registered under /api/ba prefix", () => {
+        const basePath = auth.options.basePath;
+        expect(basePath).toBe("/api/ba");
+    });
+
+    it("plugins don't throw during auth instance initialization", async () => {
+        vi.resetModules();
+        let error: Error | null = null;
+        try {
+            const mod = await import("@/lib/better-auth");
+            expect(mod.auth).toBeDefined();
+        } catch (e) {
+            error = e as Error;
+        }
+        expect(error).toBeNull();
+    });
+});
+
+describe("Plugin coexistence across editions", () => {
+    it("all plugins initialize in local edition without errors", async () => {
+        mockIsCloud = false;
+        vi.resetModules();
+        const mod = await import("@/lib/better-auth");
+        expect(mod.auth).toBeDefined();
+        expect(mod.auth.options.plugins).toBeDefined();
+    });
+
+    it("all plugins initialize in cloud edition without errors", async () => {
+        mockIsCloud = true;
+        vi.resetModules();
+        const mod = await import("@/lib/better-auth");
+        expect(mod.auth).toBeDefined();
+        expect(mod.auth.options.plugins).toBeDefined();
     });
 });
