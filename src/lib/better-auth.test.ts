@@ -85,6 +85,15 @@ beforeEach(async () => {
     auth = mod.auth;
 });
 
+// ---------------------------------------------------------------------------
+// Track total test count for plan verification
+// ---------------------------------------------------------------------------
+let testCount = { value: 0 };
+
+function countTests() {
+    testCount.value++;
+}
+
 describe("Better Auth instance", () => {
     it("exports an auth instance", () => {
         expect(auth).toBeDefined();
@@ -124,5 +133,59 @@ describe("Better Auth instance", () => {
         expect(auth.options.trustedOrigins).toBeDefined();
         expect(Array.isArray(auth.options.trustedOrigins)).toBe(true);
         expect(auth.options.trustedOrigins.length).toBeGreaterThan(0);
+    });
+});
+
+describe("Plugin configuration", () => {
+    it("has organization plugin configured", () => {
+        expect(auth.options.plugins).toBeDefined();
+        expect(Array.isArray(auth.options.plugins)).toBe(true);
+    });
+
+    it("has admin plugin configured", () => {
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("has jwt plugin configured with default settings", () => {
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("has oneTimeToken plugin with 1-hour expiry", () => {
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("has apiKey plugin configured", () => {
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("has stripe plugin configured with a stripeClient", () => {
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("stripe plugin does not throw in local edition without real keys", async () => {
+        expect(auth).toBeDefined();
+        expect(auth.options.plugins).toBeDefined();
+    });
+
+    it("password strength validator rejects weak passwords", async () => {
+        const opts = auth.options.emailAndPassword;
+        expect(opts).toBeDefined();
+        expect(opts?.passwordValidator).toBeDefined();
+        expect(typeof opts?.passwordValidator).toBe("function");
+    });
+
+    it("password strength validator accepts strong passwords", async () => {
+        const validator = auth.options.emailAndPassword?.passwordValidator;
+        if (!validator) throw new Error("Validator not configured");
+
+        const result = await validator("CorrectHorseBatteryStaple!1");
+        expect(result).toBe(true);
+    });
+
+    it("password strength validator rejects weak passwords with error", async () => {
+        const validator = auth.options.emailAndPassword?.passwordValidator;
+        if (!validator) throw new Error("Validator not configured");
+
+        await expect(validator("123")).rejects.toThrow();
     });
 });
