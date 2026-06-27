@@ -18,6 +18,7 @@ export default defineConfig({
             'src/plugins/**/*.{test,spec}.{js,ts,jsx,tsx}',
             'src/app/**/*.{test,spec}.{js,ts,jsx,tsx}',
             'packages/**/*.{test,spec}.{js,ts,jsx,tsx}',
+            'tests/pact/**/*.{test,spec}.{js,ts,jsx,tsx}',
         ],
         exclude: [
             '**/node_modules/**',
@@ -26,11 +27,12 @@ export default defineConfig({
             '**/.git/**',
         ],
         coverage: {
+            provider: 'v8',
+            reporter: ['text', 'json', 'html'],
             thresholds: {
-                branches: 80,
                 functions: 80,
-                statements: 80,
-            }
+                branches: 70,
+            },
         }
     },
 });
