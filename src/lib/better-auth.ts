@@ -31,11 +31,7 @@ import { evaluatePasswordStrength, MIN_PASSWORD_SCORE } from "@/lib/password-str
 // gracefully: customer creation and webhook processing silently no-op when
 // the key is a dummy.
 const stripeClient = new Stripe(
-    process.env.STRIPE_SECRET_KEY || "sk_test_dummy_key_for_local_edition",
-    {
-        // apiVersion matches the Stripe SDK default for ^22.2.0
-        apiVersion: "2026-03-25.dahlia",
-    }
+    process.env.STRIPE_SECRET_KEY || "sk_test_dummy_key_for_local_edition"
 );
 
 export const auth = betterAuth({

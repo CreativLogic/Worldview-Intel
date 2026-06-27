@@ -1,13 +1,3 @@
-/**
- * Tests for zxcvbn-ts password strength evaluation.
- *
- * Verifies:
- *  1. Empty password returns score 0
- *  2. Very weak passwords score below MIN_PASSWORD_SCORE
- *  3. Common passwords score below MIN_PASSWORD_SCORE
- *  4. Strong passphrases score >= 3
- *  5. Feedback string is provided for weak passwords
- */
 import { describe, it, expect } from "vitest";
 import { evaluatePasswordStrength, MIN_PASSWORD_SCORE } from "./password-strength";
 
@@ -15,6 +5,7 @@ describe("evaluatePasswordStrength", () => {
     it("returns score 0 for empty password", () => {
         const result = evaluatePasswordStrength("");
         expect(result.score).toBe(0);
+        expect(result.feedback).toBe("Password is empty.");
     });
 
     it("returns score < MIN_PASSWORD_SCORE for a very weak password", () => {
@@ -30,9 +21,22 @@ describe("evaluatePasswordStrength", () => {
     it("returns score >= 3 for a strong passphrase", () => {
         const result = evaluatePasswordStrength("CorrectHorseBatteryStaple!1");
         expect(result.score).toBeGreaterThanOrEqual(3);
+        expect(result.feedback).toBe("Password is strong.");
     });
 
-    it("returns feedback string for weak passwords", () => {
+    it("returns acceptable feedback for moderate password (score = 2)", () => {
+        const result = evaluatePasswordStrength("th3M0n3y!");
+        expect(result.score).toBe(MIN_PASSWORD_SCORE);
+        expect(result.feedback).toBe("Password is acceptable.");
+    });
+
+    it("returns warning fallback when zxcvbn returns no warning", () => {
+        const result = evaluatePasswordStrength("x!");
+        expect(result.score).toBeLessThan(MIN_PASSWORD_SCORE);
+        expect(result.feedback).toContain("Password is too weak.");
+    });
+
+    it("returns feedback string for weak passwords with suggestions", () => {
         const result = evaluatePasswordStrength("123");
         expect(result.feedback.length).toBeGreaterThan(0);
     });
