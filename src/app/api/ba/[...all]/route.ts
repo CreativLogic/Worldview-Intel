@@ -1,8 +1,8 @@
 /**
  * Better Auth API route handler.
  *
- * Mounted at /api/auth/[...all] — coexists with NextAuth's
- * /api/auth/[...nextauth] during the Phase 71 migration.
+ * Mounted at /api/ba/[...all] to avoid catch-all collision with NextAuth's
+ * /api/auth/[...nextauth] during the Phase 71 migration coexistence period.
  *
  * Exports:
  *  - GET: session retrieval, CSRF token, JWKS (when JWT plugin added)

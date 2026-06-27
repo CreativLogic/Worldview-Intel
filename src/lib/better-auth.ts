@@ -11,6 +11,7 @@
  *  - crossSubDomainCookies gated on isCloud (local uses exact-domain cookies)
  *  - cookiePrefix "better-auth" avoids collision with NextAuth's "next-auth"
  *  - trustedOrigins configurable via env vars with localhost fallbacks
+ *  - basePath: "/api/ba" to avoid catch-all collision with NextAuth during coexistence
  *  - NO plugins configured — those come in Phase 72
  */
 import { betterAuth } from "better-auth";
@@ -19,6 +20,7 @@ import { prisma } from "@/lib/db";
 import { isCloud } from "@/core/edition";
 
 export const auth = betterAuth({
+    basePath: "/api/ba",
     database: prismaAdapter(prisma, {
         provider: "postgresql",
     }),

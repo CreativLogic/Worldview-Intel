@@ -1,5 +1,5 @@
 /**
- * Tests for Better Auth route handler at /api/auth/[...all].
+ * Tests for Better Auth route handler at /api/ba/[...all].
  *
  * Verifies:
  *  - GET and POST handlers are exported as functions
@@ -27,7 +27,7 @@ vi.mock("@/lib/better-auth", () => ({
 
 import { GET, POST } from "./route";
 
-describe("Better Auth route handler (/api/auth/[...all])", () => {
+describe("Better Auth route handler (/api/ba/[...all])", () => {
     it("exports GET handler as a function", () => {
         expect(GET).toBeDefined();
         expect(typeof GET).toBe("function");
@@ -39,7 +39,7 @@ describe("Better Auth route handler (/api/auth/[...all])", () => {
     });
 
     it("GET returns a Response", async () => {
-        const req = new Request("http://localhost:3000/api/auth/session");
+        const req = new Request("http://localhost:3000/api/ba/session");
         const res = await GET(req);
         expect(res).toBeInstanceOf(Response);
         expect(res.status).toBe(200);
@@ -47,7 +47,7 @@ describe("Better Auth route handler (/api/auth/[...all])", () => {
 
     it("POST returns a Response", async () => {
         const req = new Request(
-            "http://localhost:3000/api/auth/sign-in/email",
+            "http://localhost:3000/api/ba/sign-in/email",
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
