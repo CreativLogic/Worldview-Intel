@@ -23,6 +23,7 @@ export default defineConfig({
   // marketplace-redirect-handshake.spec.ts and marketplace-sign-out.spec.ts require marketplace.wwv.local:3002
   //   — use playwright.cross-app.config.ts for these cross-origin handshake tests
   testIgnore: [
+    '**/pact/**',
     '**/web-auth.spec.ts',
     '**/marketplace-from-instance.spec.ts',
     '**/marketplace-redirect-handshake.spec.ts',
