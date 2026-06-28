@@ -34,6 +34,7 @@ const PUBLIC_API_PREFIXES = [
     "/api/mcp",
     "/api/globe",
     "/api/v1/entities",
+    "/api/places",
     "/api/marketplace",
     "/api/glitchtip-tunnel",
     "/api/build",
