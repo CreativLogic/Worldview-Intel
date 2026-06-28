@@ -82,18 +82,18 @@ Before running the application, ensure you have the following installed:
 
 ## Quick Start (Self-Hosting)
 
-WorldWideView uses a multi-stage Dockerfile designed for standalone output. To deploy instantly on your own server:
+Worldview Intel uses a multi-stage Dockerfile designed for standalone output. To deploy instantly on your own server:
 
 **Mac/Linux:**
 ```bash
-mkdir worldwideview && cd worldwideview
-curl -fsSL https://raw.githubusercontent.com/silvertakana/worldwideview/main/self-host/setup.sh | bash
+mkdir Worldview-Intel && cd Worldview-Intel
+curl -fsSL https://raw.githubusercontent.com/CreativLogic/Worldview-Intel/main/self-host/setup.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-mkdir worldwideview; cd worldwideview
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/silvertakana/worldwideview/main/self-host/setup.ps1 -UseBasicParsing | Invoke-Expression
+mkdir Worldview-Intel; cd Worldview-Intel
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/CreativLogic/Worldview-Intel/main/self-host/setup.ps1 -UseBasicParsing | Invoke-Expression
 ```
 
 > [!NOTE]
@@ -104,8 +104,8 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/silvertakana/worldwidev
 To run the source code locally for contributing or developing:
 
 ```bash
-git clone https://github.com/silvertakana/worldwideview.git
-cd worldwideview
+git clone https://github.com/CreativLogic/Worldview-Intel.git
+cd Worldview-Intel
 pnpm install
 pnpm run setup   # generates .env.local with AUTH_SECRET
 pnpm run dev:all # boots the UI, cache layers, and the data engine
@@ -117,7 +117,7 @@ Visit `http://localhost:3000` to see the live globe.
 The codebase utilizes a `pnpm` monorepo configuration:
 
 ```text
-worldwideview/
+Worldview-Intel/
 ├── src/                  # Core frontend app
 │   ├── app/              # Next.js App Router (pages, API routes)
 │   ├── components/       # Shared UI, Globe panels, and 3D layouts
@@ -132,7 +132,7 @@ worldwideview/
 
 ## Plugin Ecosystem
 
-WorldWideView operates on an open-core philosophy. The platform itself is data-agnostic; all data sources are dynamically imported as plugins at runtime.
+Worldview Intel operates on an open-core philosophy. The platform itself is data-agnostic; all data sources are dynamically imported as plugins at runtime.
 
 - **[Plugin Quickstart Guide](docs/plugin-quickstart.md)**: Learn how to scaffold and link your first plugin using the `@worldwideview/cli`.
 - **[Advanced Plugin Guide](docs/plugin-advanced.md)**: Deep dive into microservice data seeders, WebSockets, complex 3D rendering, and Marketplace publishing.
@@ -141,7 +141,7 @@ WorldWideView operates on an open-core philosophy. The platform itself is data-a
 
 WorldWideView is distributed across several specialized repositories:
 
-1. **`worldwideview`** (This Repo): Main frontend, CesiumJS rendering engine, and core plugin framework.
+1. **`Worldview-Intel`** (This Repo): Main frontend, CesiumJS rendering engine, and core plugin framework.
 2. **`wwv-data-engine`**: Open-source community data backend for polling public APIs.
 3. **`worldwideview-plugins`**: First-party maintained plugins.
 4. **`worldwideview-marketplace`**: The web application driving the plugin directory.
@@ -163,7 +163,7 @@ Add the following block to your MCP client configuration. Replace `https://your-
 ```json
 {
   "mcpServers": {
-    "worldwideview": {
+    "Worldview-Intel": {
       "type": "http",
       "url": "https://your-host/api/mcp",
       "headers": {
